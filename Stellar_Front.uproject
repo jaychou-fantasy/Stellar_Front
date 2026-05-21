@@ -1,0 +1,22 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "{DC6AC395-BF41-C8E5-C18F-EF84D8AF0191}",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "Stellar_Front",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		}
+	]
+}
