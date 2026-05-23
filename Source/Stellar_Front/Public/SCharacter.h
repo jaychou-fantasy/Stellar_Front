@@ -14,7 +14,7 @@ class UInputMappingContext;
 class UInputComponent;
 class USkeletalMeshComponent;
 class UCameraComponent;
-class ASProjectile;
+class ASProjectileBase;
 class USoundBase;
 class UAnimSequence;
 class UParticleSystem;
@@ -68,7 +68,7 @@ public:
 
 	/** Projectile class to spawn */
 	UPROPERTY(EditDefaultsOnly, Category="Projectile")
-	TSubclassOf<ASProjectile> ProjectileClass;
+	TSubclassOf<ASProjectileBase> ProjectileClass;
 
 	/** Sound to play each time we fire */
 	UPROPERTY(EditDefaultsOnly, Category="Gameplay")

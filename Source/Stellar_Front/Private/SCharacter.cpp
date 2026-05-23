@@ -5,7 +5,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
-#include "SProjectile.h"
+#include "SProjectileBase.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -101,7 +101,7 @@ void ASCharacter::Fire()
 		ActorSpawnParams.Instigator = this;
 
 		// spawn the projectile at the muzzle
-		GetWorld()->SpawnActor<ASProjectile>(ProjectileClass, MuzzleLocation, MuzzleRotation, ActorSpawnParams);
+		GetWorld()->SpawnActor<ASProjectileBase>(ProjectileClass, MuzzleLocation, MuzzleRotation, ActorSpawnParams);
 	}
 
 	UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());

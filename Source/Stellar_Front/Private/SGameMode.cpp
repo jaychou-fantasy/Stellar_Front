@@ -1,7 +1,6 @@
 // Copyright 1998-2017 Epic Games, Inc. All Rights Reserved.
 
 #include "SGameMode.h"
-#include "SHUD.h"
 #include "SCharacter.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -12,5 +11,5 @@ ASGameMode::ASGameMode()
 	DefaultPawnClass = PlayerPawnClassFinder.Class;
 
 	// use our custom HUD class
-	HUDClass = ASHUD::StaticClass();
+	//HUDClass = ASHUD::StaticClass();
 }
