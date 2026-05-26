@@ -4,6 +4,7 @@
 #include "SProj_NormalBullet.h"
 #include "Components/SphereComponent.h"
 #include "SAttributeComponent.h"
+#include "SGameplayFunctionLibrary.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 
 ASProj_NormalBullet::ASProj_NormalBullet()
@@ -17,5 +18,12 @@ ASProj_NormalBullet::ASProj_NormalBullet()
 
 void ASProj_NormalBullet::OnActorOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	
+	//we set this "Instigator" in "SpawnActor<>()" s
+	if (OtherActor && OtherActor != GetInstigator())
+	{
+		if (USGameplayFunctionLibrary::ApplyDamageAndImpulse(GetInstigator(),OtherActor,DamageAmount,SweepResult))
+		{
+			Explode();
+		}
+	}
 }
