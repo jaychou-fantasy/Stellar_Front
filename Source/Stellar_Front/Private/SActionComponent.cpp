@@ -156,8 +156,8 @@ bool USActionComponent::StartActionByName(AActor* Instigator, FName ActionName)
 			 we need to replicate the actions container and the bIsRunning state.
 			 First replicate the actions, then replicate StartAction.*/
 		}
-		return false;
 	}
+	return false;
 }
 
 bool USActionComponent::StopActionByName(AActor* Instigator, FName ActionName)
