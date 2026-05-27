@@ -5,6 +5,8 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
+#include "SActionComponent.h"
+#include "SAttributeComponent.h"
 #include "SProjectileBase.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
@@ -32,6 +34,10 @@ ASCharacter::ASCharacter()
 	GunMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FP_Gun"));
 	GunMeshComponent->CastShadow = false;
 	GunMeshComponent->SetupAttachment(Mesh1PComponent, "GripPoint");
+	
+	ActionComp = CreateDefaultSubobject<USActionComponent>("ActionComp");
+	AttributeComp = CreateDefaultSubobject<USAttributeComponent>("AttributeComp");
+	
 }
 
 
@@ -52,6 +58,11 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
 	// Add mappings for our game, more complex games may have multiple Contexts that are added/removed at runtime
 	Subsystem->AddMappingContext(DefaultInputMapping, 0);
+}
+
+FVector ASCharacter::GetPawnViewLocation() const
+{
+	return CameraComponent->GetComponentLocation();
 }
 
 
@@ -87,34 +98,7 @@ void ASCharacter::OnJumped_Implementation()
 
 void ASCharacter::Fire()
 {
-	// try and fire a projectile
-	if (ProjectileClass)
-	{
-		// Grabs location from the mesh that must have a socket called "Muzzle" in his skeleton
-		FVector MuzzleLocation = GunMeshComponent->GetSocketLocation("Muzzle");
-		// Use controller rotation which is our view direction in first person
-		FRotator MuzzleRotation = GetControlRotation();
-
-		//Set Spawn Collision Handling Override
-		FActorSpawnParameters ActorSpawnParams;
-		ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
-		ActorSpawnParams.Instigator = this;
-
-		// spawn the projectile at the muzzle
-		GetWorld()->SpawnActor<ASProjectileBase>(ProjectileClass, MuzzleLocation, MuzzleRotation, ActorSpawnParams);
-	}
-
-	UGameplayStatics::PlaySoundAtLocation(this, FireSound, GetActorLocation());
-
-	// Get the animation object for the arms mesh
-	UAnimInstance* AnimInstance = Mesh1PComponent->GetAnimInstance();
-	if (AnimInstance)
-	{
-		AnimInstance->PlaySlotAnimationAsDynamicMontage(FireAnimation, "Arms", 0.0f);
-	}
-
-	// Play Muzzle FX
-	UGameplayStatics::SpawnEmitterAttached(MuzzleFlash, GunMeshComponent, "Muzzle");
+	ActionComp->StartActionByName(this,"Fire");
 }
 
 void ASCharacter::MoveInput(const FInputActionValue& InputValue)

@@ -11,6 +11,13 @@ USAnimInstance::USAnimInstance()
 	SwaySpeed = 3.0f;
 }
 
+void USAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
+{
+	Super::NativeUpdateAnimation(DeltaSeconds);
+
+	// The weapon sway itself is applied to a specific bone in the AnimationBlueprint
+	CalcWeaponSway(DeltaSeconds);
+}
 
 void USAnimInstance::CalcWeaponSway(float DeltaTime)
 {
@@ -40,10 +47,3 @@ void USAnimInstance::CalcWeaponSway(float DeltaTime)
 	SwayDeltaTranslation = FMath::Lerp(SwayDeltaTranslation, InputDirection, DeltaTime * SwaySpeed);
 }
 
-void USAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
-{
-	Super::NativeUpdateAnimation(DeltaSeconds);
-
-	// The weapon sway itself is applied to a specific bone in the AnimationBlueprint
-	CalcWeaponSway(DeltaSeconds);
-}

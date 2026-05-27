@@ -14,6 +14,7 @@ ASProjectileBase::ASProjectileBase()
 	// Use a sphere as a simple collision representation
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
 	SphereComp->SetCollisionProfileName("Projectile");
+	SphereComp->SetSphereRadius(SphereRadius);
 	/*************///Assign on "OnComponentHit"
 	SphereComp->OnComponentHit.AddDynamic(this, &ASProjectileBase::OnActorHit);	// set up a notification for when this component hits something blocking
 	RootComponent = SphereComp;

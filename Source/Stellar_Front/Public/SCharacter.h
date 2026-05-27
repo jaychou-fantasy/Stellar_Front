@@ -7,7 +7,6 @@
 
 // Included for struct FInputActionInstance (Enhanced Input)
 #include "InputAction.h"
-
 #include "SCharacter.generated.h"
 
 class UInputMappingContext;
@@ -18,6 +17,8 @@ class ASProjectileBase;
 class USoundBase;
 class UAnimSequence;
 class UParticleSystem;
+class USAttributeComponent;
+class USActionComponent;
 
 
 UCLASS()
@@ -57,6 +58,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	UCameraComponent* CameraComponent;
 
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Components")
+	USAttributeComponent* AttributeComp;
+	
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Components")
+	USActionComponent* ActionComp;
+	
+	
 	UPROPERTY(EditDefaultsOnly, Category = "Camera")
 	TSubclassOf<UCameraShakeBase> LandedCameraShake;
 
@@ -65,21 +73,6 @@ protected:
 
 public:
 	ASCharacter();
-
-	/** Projectile class to spawn */
-	UPROPERTY(EditDefaultsOnly, Category="Projectile")
-	TSubclassOf<ASProjectileBase> ProjectileClass;
-
-	/** Sound to play each time we fire */
-	UPROPERTY(EditDefaultsOnly, Category="Gameplay")
-	USoundBase* FireSound;
-
-	/** AnimMontage to play each time we fire */
-	UPROPERTY(EditDefaultsOnly, Category = "Gameplay")
-	UAnimSequence* FireAnimation;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
-	UParticleSystem* MuzzleFlash;
 
 	virtual void Landed(const FHitResult& Hit) override;
 
@@ -100,7 +93,12 @@ public:
 	/** Returns Mesh1P subobject **/
 	USkeletalMeshComponent* GetMesh1P() const { return Mesh1PComponent; }
 
+	/** Returns GunMesh subobject **/
+	USkeletalMeshComponent* GetGunMesh() const { return GunMeshComponent; }
+	
 	/** Returns FirstPersonCameraComponent subobject **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return CameraComponent; }
 
+	virtual FVector GetPawnViewLocation() const override;
+	
 };

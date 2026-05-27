@@ -26,6 +26,8 @@ public:
 	ASProjectileBase();
 
 protected:
+	UPROPERTY(EditDefaultsOnly,Category = "Damage")
+	float SphereRadius = 20.0f;
 	
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Damage")
 	float DamageAmount;
@@ -81,4 +83,6 @@ public:
 
 	/** Returns ProjectileMovement subobject **/
 	UProjectileMovementComponent* GetProjectileMovement() const { return ProjectileMovementComp; }
+	
+	float GetSphereRadius() const { return SphereRadius; }
 };
