@@ -19,6 +19,7 @@ class UAnimSequence;
 class UParticleSystem;
 class USAttributeComponent;
 class USActionComponent;
+class USInteractionComponent;
 
 
 UCLASS()
@@ -45,7 +46,13 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category= "Input")
 	UInputAction* Input_Fire;
+	
+	UPROPERTY(EditDefaultsOnly, Category= "Input")
+	UInputAction* Input_Interact;
 
+	UPROPERTY(EditDefaultsOnly, Category= "Input")
+	UInputAction* Input_Aim;
+	
 	/** Pawn mesh: 1st person view  */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mesh")
 	USkeletalMeshComponent* Mesh1PComponent;
@@ -63,6 +70,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Components")
 	USActionComponent* ActionComp;
+	
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Components")
+	USInteractionComponent* InteractionComp;
 	
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Camera")
@@ -87,6 +97,8 @@ protected:
 
 	void LookInput(const FInputActionValue& InputValue);
 
+	void PrimaryInteract(const FInputActionValue& InputValue);
+	
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 
 public:

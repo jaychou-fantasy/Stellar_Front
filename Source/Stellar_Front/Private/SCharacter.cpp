@@ -7,6 +7,7 @@
 #include "InputMappingContext.h"
 #include "SActionComponent.h"
 #include "SAttributeComponent.h"
+#include "SInteractionComponent.h"
 #include "SProjectileBase.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
@@ -37,9 +38,13 @@ ASCharacter::ASCharacter()
 	
 	ActionComp = CreateDefaultSubobject<USActionComponent>("ActionComp");
 	AttributeComp = CreateDefaultSubobject<USAttributeComponent>("AttributeComp");
-	
+	InteractionComp = CreateDefaultSubobject<USInteractionComponent>("InteractionComp");
 }
 
+FVector ASCharacter::GetPawnViewLocation() const
+{
+	return CameraComponent->GetComponentLocation();
+}
 
 void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -52,17 +57,14 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	EnhancedInputComponent->BindAction(Input_Jump, ETriggerEvent::Triggered, this, &ACharacter::Jump);
 	EnhancedInputComponent->BindAction(Input_Fire, ETriggerEvent::Triggered, this, &ASCharacter::Fire);
 
+	EnhancedInputComponent->BindAction(Input_Interact,ETriggerEvent::Triggered,this,&ASCharacter::PrimaryInteract);
+	
 	const APlayerController* PC = GetController<APlayerController>();
 	const ULocalPlayer* LP = PC->GetLocalPlayer();
 
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
 	// Add mappings for our game, more complex games may have multiple Contexts that are added/removed at runtime
 	Subsystem->AddMappingContext(DefaultInputMapping, 0);
-}
-
-FVector ASCharacter::GetPawnViewLocation() const
-{
-	return CameraComponent->GetComponentLocation();
 }
 
 
@@ -120,4 +122,9 @@ void ASCharacter::LookInput(const FInputActionValue& InputValue)
 
 	AddControllerYawInput(LookValue.X);
 	AddControllerPitchInput(LookValue.Y);
+}
+
+void ASCharacter::PrimaryInteract(const FInputActionValue& InputValue)
+{
+	InteractionComp->PrimaryInteract();
 }
