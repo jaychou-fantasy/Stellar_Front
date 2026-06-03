@@ -92,6 +92,8 @@ protected:
 
 	/** Fires a projectile. */
 	void Fire();
+	
+	void Aim();
 
 	void MoveInput(const FInputActionValue& InputValue);
 

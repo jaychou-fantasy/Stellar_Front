@@ -53,10 +53,12 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	EnhancedInputComponent->BindAction(Input_Move, ETriggerEvent::Triggered, this, &ASCharacter::MoveInput);
 	EnhancedInputComponent->BindAction(Input_Look, ETriggerEvent::Triggered, this, &ASCharacter::LookInput);
 
-	// Jump exists in the base class, we dont need our own function
+	// Jump exists in the base class, we don't need our own function
 	EnhancedInputComponent->BindAction(Input_Jump, ETriggerEvent::Triggered, this, &ACharacter::Jump);
 	EnhancedInputComponent->BindAction(Input_Fire, ETriggerEvent::Triggered, this, &ASCharacter::Fire);
+	EnhancedInputComponent->BindAction(Input_Aim, ETriggerEvent::Triggered, this, &ASCharacter::Aim);
 
+	
 	EnhancedInputComponent->BindAction(Input_Interact,ETriggerEvent::Triggered,this,&ASCharacter::PrimaryInteract);
 	
 	const APlayerController* PC = GetController<APlayerController>();
@@ -101,6 +103,11 @@ void ASCharacter::OnJumped_Implementation()
 void ASCharacter::Fire()
 {
 	ActionComp->StartActionByName(this,"Fire");
+}
+
+void ASCharacter::Aim()
+{
+	ActionComp->StartActionByName(this,"Aim");
 }
 
 void ASCharacter::MoveInput(const FInputActionValue& InputValue)
