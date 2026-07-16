@@ -21,7 +21,7 @@ public:
 	ASGameMode_StellarFront();
 	
 	virtual void PostLogin(APlayerController* NewPlayer) override;
-
+	
 	virtual bool ReadyToStartMatch_Implementation() override;
 	
 	virtual void HandleMatchHasStarted() override;
@@ -38,15 +38,19 @@ public:
 	void StartDeployment();
 	void EndDeployment();
 	
+	//@fixme: set to protected if done
+	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite, Category = "GameMode")
+	int32 MaxPlayerPerTeam = 20;
 protected:
 	
 	
 	// UPROPERTY()
 	// bool bReady = false;
 	
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "GameMode")
-	int32 MaxPlayerPerTeam = 20;	
+		
 	
+	int32 RedCnt = 0;
+	int32 BlueCnt = 0;
 	
 	void AssignTeam(APlayerState* PlayerState);
 	

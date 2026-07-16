@@ -35,5 +35,6 @@ void ASGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(ASGameState, EvacShipLocation);                                                                     
 	DOREPLIFETIME(ASGameState, EvacTimeRemaining);                                                                    
 	DOREPLIFETIME(ASGameState, RedScore);                                                                             
-	DOREPLIFETIME(ASGameState, BlueScore);                                                                            
+	DOREPLIFETIME(ASGameState, BlueScore);         
+
 }       

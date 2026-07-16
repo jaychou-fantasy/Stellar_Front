@@ -33,11 +33,16 @@ public:
 
 	// -- Getters --
 	ETeam GetTeam() const { return Team; }
-	EPlayerRole GetRole() const { return Role; }
-
+	EPlayerRole GetRole() const { return PlayerRole; }
+	
+	void SetReady() { if (HasAuthority()) bReady = true; }
+	bool GetReady() const { return bReady; }
+	
+	
+	
 	// -- Setters (server-only, HasAuthority guarded) --
 	void SetTeam(ETeam NewTeam)           { if (HasAuthority()) Team = NewTeam; }
-	void SetRole(EPlayerRole NewRole)      { if (HasAuthority()) Role = NewRole; }
+	void SetRole(EPlayerRole NewRole)      { if (HasAuthority()) PlayerRole = NewRole; }
 	void SetCarryingKey(bool bCarry)       { if (HasAuthority()) bIsCarryingKey = bCarry; }
 	void SetIsAlive(bool bAlive)           { if (HasAuthority()) bIsAlive = bAlive; }
 	void MarkEvacuated()                   { if (HasAuthority()) bHasEvacuated = true; }
@@ -48,12 +53,17 @@ public:
 	//void AddAssists() { if (HasAuthority()) Assists++; } 
 
 
+	
+
 protected:
 	UPROPERTY(Replicated,BlueprintReadOnly)
 	ETeam Team;
 	
 	UPROPERTY(Replicated,BlueprintReadOnly)
-	EPlayerRole Role = EPlayerRole::Assault;
+	EPlayerRole PlayerRole = EPlayerRole::Assault;
+	
+	UPROPERTY(Replicated,BlueprintReadOnly)
+	bool bReady = false;
 	
 	UPROPERTY(Replicated,BlueprintReadOnly)
 	int32 Kills = 0;

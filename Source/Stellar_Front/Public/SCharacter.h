@@ -53,13 +53,26 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category= "Input")
 	UInputAction* Input_Aim;
 	
+	UPROPERTY(EditDefaultsOnly, Category= "Input")
+	UInputAction* Input_Sprint;
+	
+	
 	/** Pawn mesh: 1st person view  */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mesh")
-	USkeletalMeshComponent* Mesh1PComponent;
+	USkeletalMeshComponent* ArmComponent;
 
 	/** Gun mesh: 1st person view (seen only by self) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
 	USkeletalMeshComponent* GunMeshComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	UStaticMeshComponent* Barrel;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	UStaticMeshComponent* Stock;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	UStaticMeshComponent* Magazine;
 
 	/** First person camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
@@ -94,6 +107,9 @@ protected:
 	void Fire();
 	
 	void Aim();
+	
+	void StartSprint();
+	void StopSprint();
 
 	void MoveInput(const FInputActionValue& InputValue);
 
@@ -105,7 +121,7 @@ protected:
 
 public:
 	/** Returns Mesh1P subobject **/
-	USkeletalMeshComponent* GetMesh1P() const { return Mesh1PComponent; }
+	USkeletalMeshComponent* GetArm() const { return ArmComponent; }
 
 	/** Returns GunMesh subobject **/
 	USkeletalMeshComponent* GetGunMesh() const { return GunMeshComponent; }
@@ -115,4 +131,7 @@ public:
 
 	virtual FVector GetPawnViewLocation() const override;
 	
+	void PostInitializeComponents() override;
+	
+	void BeginPlay() override;
 };

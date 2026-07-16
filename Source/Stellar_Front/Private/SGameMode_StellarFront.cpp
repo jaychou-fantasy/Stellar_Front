@@ -35,8 +35,6 @@ void ASGameMode_StellarFront::PostLogin(APlayerController* NewPlayer)
 //@fixme:: we can parse RedCnt&BlueCnt as a global Variable,and we don't need to calculate when every player login in (or maybe 20 is rather small,don't bother to change)
 void ASGameMode_StellarFront::AssignTeam(APlayerState* PlayerState)
 {
-	int32 RedCnt = 0;
-	int32 BLueCnt = 0;
 	for (APlayerState* State : GameState->PlayerArray)
 	{
 		ASPlayerState* SPS = Cast<ASPlayerState>(State);
@@ -50,12 +48,12 @@ void ASGameMode_StellarFront::AssignTeam(APlayerState* PlayerState)
 		}
 		else
 		{
-			BLueCnt++;
+			BlueCnt++;
 		}
 	}
 	
 	ASPlayerState* MyPS = Cast<ASPlayerState>(PlayerState);
-	MyPS->SetTeam((RedCnt <= BLueCnt) ? ETeam::Red : ETeam::Blue);
+	MyPS->SetTeam((RedCnt <= BlueCnt) ? ETeam::Red : ETeam::Blue);
 }
 
 void ASGameMode_StellarFront::SetPhase(EGamePhase NewPhase)
@@ -76,27 +74,29 @@ void ASGameMode_StellarFront::SetPhase(EGamePhase NewPhase)
 
 bool ASGameMode_StellarFront::ReadyToStartMatch_Implementation()
 {
+	if (RedCnt == MaxPlayerPerTeam && BlueCnt == MaxPlayerPerTeam)
+	{
+		return true;
+	}
+	if (RedCnt >=1 &&BlueCnt >=1)
+	{
+		for (APlayerState* State :GameState->PlayerArray)
+		{
+			ASPlayerState* PlayerState = Cast<ASPlayerState>(State);
+			// @fixme: continue if "Spectator"
+			if (!PlayerState || !PlayerState->GetReady())
+			{
+				return false;
+			}
+		}
+	}
 	return Super::ReadyToStartMatch_Implementation();
 }
 
 void ASGameMode_StellarFront::HandleMatchHasStarted()
 {
 	Super::HandleMatchHasStarted();
-}
-
-bool ASGameMode_StellarFront::ReadyToEndMatch_Implementation()
-{
-	return Super::ReadyToEndMatch_Implementation();
-}
-
-void ASGameMode_StellarFront::HandleMatchHasEnded()
-{
-	Super::HandleMatchHasEnded();
-}
-
-void ASGameMode_StellarFront::Logout(AController* Exiting)
-{
-	Super::Logout(Exiting);
+	StartDeployment();
 }
 
 void ASGameMode_StellarFront::StartDeployment()
@@ -113,5 +113,32 @@ void ASGameMode_StellarFront::EndDeployment()
 {
 	SetPhase(EGamePhase::OrbitalCombat);
 }
+
+
+bool ASGameMode_StellarFront::ReadyToEndMatch_Implementation()
+{
+	return Super::ReadyToEndMatch_Implementation();
+}
+
+void ASGameMode_StellarFront::HandleMatchHasEnded()
+{
+	Super::HandleMatchHasEnded();
+}
+
+void ASGameMode_StellarFront::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+}
+
+void ASGameMode_StellarFront::StartMatch()
+{
+	Super::StartMatch();
+}
+
+void ASGameMode_StellarFront::EndMatch()
+{
+	Super::EndMatch();
+}
+
 
 

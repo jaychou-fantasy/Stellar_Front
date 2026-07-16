@@ -37,6 +37,7 @@ public:
 		return CurrentPhase;
 	}
 	
+	
 	// ==== PreDeploy ====
 	//@fixme:use protected and Getter after debugging
 	UPROPERTY(Replicated,BlueprintReadWrite,Category = "Deploy")

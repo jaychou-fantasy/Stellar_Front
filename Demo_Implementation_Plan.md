@@ -6,9 +6,9 @@
 | 步骤 | 状态 | 完成时间 |
 |------|------|---------|
 | 1 — SPlayerState Replicated 变量 | ✅ 完成 | — |
-| 2 — ASGameState 全局状态 | ✅ 基本完成 | — |
-| 3 — 修复 GameMode 裸指针 | ⬜ 待做 | — |
-| 4 — 队伍分配与比赛启动 | ⬜ 待做 | — |
+| 2 — ASGameState 全局状态 | ✅ 完成 | — |
+| 3 — 修复 GameMode 裸指针 | ✅ 完成 | — |
+| 4 — 队伍分配与比赛启动 | ✅ 完成 | — |
 | 5 — 阶段转换系统 | ⬜ 待做 | — |
 | 6 — 资源系统 | ⬜ 待做 | — |
 | 7 — 武器层级解锁 | ⬜ 待做 | — |
@@ -20,8 +20,6 @@
 | 13 — Demo 地图搭建 | ⬜ 待做 | — |
 | 14 — HUD/UI | ⬜ 待做 | — |
 | 15 — 端到端测试 | ⬜ 待做 | — |
-
-> **SGameState 待修复提醒**: `GetLifetimeReplicatedProps` 尚未实现，当前所有 Replicated 变量实际上不会复制。需要在 `.h` 加 `virtual void GetLifetimeReplicatedProps(...) const override;`，在 `.cpp` 加 `DOREPLIFETIME` 注册所有变量。
 
 ---
 ## 总览

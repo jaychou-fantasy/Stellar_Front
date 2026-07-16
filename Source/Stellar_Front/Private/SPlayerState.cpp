@@ -10,17 +10,19 @@ ASPlayerState::ASPlayerState()
 }
 
 
-void ASPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) __const
+void ASPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
 	DOREPLIFETIME(ASPlayerState,Team);
-	DOREPLIFETIME(ASPlayerState,Role);
+	DOREPLIFETIME(ASPlayerState,PlayerRole);
 	DOREPLIFETIME(ASPlayerState,Kills);
 	DOREPLIFETIME(ASPlayerState,Deaths);
 	//DOREPLIFETIME(ASPlayerState,Assists);
 	DOREPLIFETIME(ASPlayerState,bIsCarryingKey);
 	DOREPLIFETIME(ASPlayerState,bHasEvacuated);
 	DOREPLIFETIME(ASPlayerState,bIsAlive);
+	DOREPLIFETIME(ASPlayerState, bReady);                                                                            
+
 	
 }

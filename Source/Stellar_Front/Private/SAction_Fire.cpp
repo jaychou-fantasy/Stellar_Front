@@ -22,7 +22,7 @@ void USAction_Fire::StartAction_Implementation(AActor* Instigator)
 	{
 		return;	
 	}
-	USkeletalMeshComponent* Mesh1P = Character->GetMesh1P();
+	USkeletalMeshComponent* Mesh1P = Character->GetArm();
 	USkeletalMeshComponent* GunMesh = Character->GetGunMesh();
 
 	// Get the animation object for the arms mesh

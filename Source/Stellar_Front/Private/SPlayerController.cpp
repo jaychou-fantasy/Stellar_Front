@@ -2,4 +2,13 @@
 
 
 #include "SPlayerController.h"
+#include "SPlayerState.h"
 
+void ASPlayerController::ServerSetReady_Implementation()
+{
+	ASPlayerState* PS = GetPlayerState<ASPlayerState>();                                                            
+	if (PS) 
+	{
+		PS->SetReady();    
+	}
+}

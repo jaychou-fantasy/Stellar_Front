@@ -18,33 +18,55 @@
 
 ASCharacter::ASCharacter()
 {
+	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
+ 	ArmComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CharacterMesh"));
+ 	ArmComponent->SetupAttachment(GetCapsuleComponent());
+ 	ArmComponent->CastShadow = false;
+ 	ArmComponent->SetRelativeRotation(FRotator(2.0f, -15.0f, 5.0f));
+ 	ArmComponent->SetRelativeLocation(FVector(0, 0, -160.0f));
+	
 	// Create a CameraComponent
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	CameraComponent->SetupAttachment(GetCapsuleComponent());
-	CameraComponent->SetRelativeLocation(FVector(0, 0, BaseEyeHeight)); // Position the camera
+	CameraComponent->SetupAttachment(GetArm(),TEXT("Head"));
+	//CameraComponent->SetRelativeLocation(FVector(0, 0, BaseEyeHeight)); // Position the camera
 	CameraComponent->bUsePawnControlRotation = true;
-
-	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
-	Mesh1PComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CharacterMesh"));
-	Mesh1PComponent->SetupAttachment(CameraComponent);
-	Mesh1PComponent->CastShadow = false;
-	Mesh1PComponent->SetRelativeRotation(FRotator(2.0f, -15.0f, 5.0f));
-	Mesh1PComponent->SetRelativeLocation(FVector(0, 0, -160.0f));
 
 	// Create a gun mesh component
 	GunMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FP_Gun"));
 	GunMeshComponent->CastShadow = false;
-	GunMeshComponent->SetupAttachment(Mesh1PComponent, "GripPoint");
+	GunMeshComponent->SetupAttachment(ArmComponent, TEXT("GripPoint"));
 	
+	Barrel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Barrel"));
+	Barrel->SetupAttachment(GunMeshComponent, TEXT("Barrel"));
+
+	Stock = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Stock"));
+	Stock->SetupAttachment(GunMeshComponent, TEXT("Stock"));
+
+	Magazine = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Magazine"));
+	Magazine->SetupAttachment(GunMeshComponent, TEXT("Mag 1"));
+
 	ActionComp = CreateDefaultSubobject<USActionComponent>("ActionComp");
 	AttributeComp = CreateDefaultSubobject<USAttributeComponent>("AttributeComp");
 	InteractionComp = CreateDefaultSubobject<USInteractionComponent>("InteractionComp");
+}
+
+void ASCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+}
+
+void ASCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	UE_LOG(LogTemp, Warning, TEXT("Arm has Head socket: %d"), ArmComponent->DoesSocketExist(TEXT("Head")));
+	UE_LOG(LogTemp, Warning, TEXT("Camera parent socket: %s"), *CameraComponent->GetAttachSocketName().ToString());
 }
 
 FVector ASCharacter::GetPawnViewLocation() const
 {
 	return CameraComponent->GetComponentLocation();
 }
+
 
 void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -57,6 +79,8 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	EnhancedInputComponent->BindAction(Input_Jump, ETriggerEvent::Triggered, this, &ACharacter::Jump);
 	EnhancedInputComponent->BindAction(Input_Fire, ETriggerEvent::Triggered, this, &ASCharacter::Fire);
 	EnhancedInputComponent->BindAction(Input_Aim, ETriggerEvent::Triggered, this, &ASCharacter::Aim);
+	EnhancedInputComponent->BindAction(Input_Sprint,ETriggerEvent::Triggered,this,&ASCharacter::StartSprint);
+	EnhancedInputComponent->BindAction(Input_Sprint,ETriggerEvent::Triggered,this,&ASCharacter::StopSprint);
 
 	
 	EnhancedInputComponent->BindAction(Input_Interact,ETriggerEvent::Triggered,this,&ASCharacter::PrimaryInteract);
@@ -108,6 +132,16 @@ void ASCharacter::Fire()
 void ASCharacter::Aim()
 {
 	ActionComp->StartActionByName(this,"Aim");
+}
+
+void ASCharacter::StartSprint()
+{
+	ActionComp->StartActionByName(this,"Sprint");
+}
+
+void ASCharacter::StopSprint()
+{
+	ActionComp->StopActionByName(this,"Sprint");
 }
 
 void ASCharacter::MoveInput(const FInputActionValue& InputValue)
