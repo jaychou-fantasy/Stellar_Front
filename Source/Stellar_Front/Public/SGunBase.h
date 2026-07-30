@@ -6,21 +6,51 @@
 #include "GameFramework/Actor.h"
 #include "SGunBase.generated.h"
 
-UCLASS()
+UCLASS(Abstract)
 class STELLAR_FRONT_API ASGunBase : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
-	// Sets default values for this actor's properties
 	ASGunBase();
 
+	/** Returns the skeletal mesh that belongs to this weapon. */
+	
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	USkeletalMeshComponent* GetGunMesh() const { return GunMeshComponent; }
+	
+	UFUNCTION(BlueprintCallable,Category = "Weapon")
+	FVector GetAimSocketLocation();
+
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	
+	/** Gun mesh: 1st person view (seen only by self) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	USkeletalMeshComponent* GunMeshComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	UStaticMeshComponent* Barrel;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	UStaticMeshComponent* Stock;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	UStaticMeshComponent* Magazine;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	UStaticMeshComponent* Scope;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	UStaticMeshComponent* Sight;
+	
+	UPROPERTY(EditAnywhere,BlueprintReadOnly,Category = "Weapon")
+	int32 Ammo;
+	
+	UPROPERTY(BlueprintReadOnly,Category = "Weapon")
+	FVector AimSocketLocation;
 
 public:	
-	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 };

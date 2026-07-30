@@ -4,6 +4,7 @@
 #include "SAction_Fire.h"
 //#include "GameFramework/Character.h"
 #include "SCharacter.h"
+#include "SGunBase.h"
 #include "SProjectileBase.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -15,15 +16,24 @@ USAction_Fire::USAction_Fire()
 
 void USAction_Fire::StartAction_Implementation(AActor* Instigator)
 {
-	Super::StartAction_Implementation(Instigator);
-	
 	ASCharacter* Character = Cast<ASCharacter>(Instigator);
 	if (!Character)
 	{
 		return;	
 	}
+
+	ASGunBase* Gun = Character->GetEquippedGun();
+	USkeletalMeshComponent* GunMesh = IsValid(Gun) ? Gun->GetGunMesh() : nullptr;
+	if (!IsValid(GunMesh))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot fire: no valid equipped gun mesh on %s"), *Character->GetName());
+		return;
+	}
+
+	// Only mark the action as running after all required weapon references exist.
+	Super::StartAction_Implementation(Instigator);
+
 	USkeletalMeshComponent* Mesh1P = Character->GetArm();
-	USkeletalMeshComponent* GunMesh = Character->GetGunMesh();
 
 	// Get the animation object for the arms mesh
 	//Play Arm Animation && Play Muzzle FX
@@ -33,7 +43,9 @@ void USAction_Fire::StartAction_Implementation(AActor* Instigator)
 		AnimInstance->PlaySlotAnimationAsDynamicMontage(FireAnimation, ArmSlotName, 0.0f);
 		//AnimInstance->Montage_Play(FireAnimation);
 	}
-	UGameplayStatics::SpawnEmitterAttached(MuzzleFlash, GunMesh,GunMuzzleName);
+	
+	UGameplayStatics::SpawnEmitterAttached(MuzzleFlash, GunMesh, GunMuzzleName);
+	
 	UGameplayStatics::PlaySoundAtLocation(this, FireSound, Instigator->GetActorLocation());// actuall "GunMeshCompinent Location" but we just simplify it
 
 	
@@ -54,10 +66,24 @@ void USAction_Fire::StartAction_Implementation(AActor* Instigator)
 
 void USAction_Fire::FireDelay_Elapsed(ASCharacter* InstigatorCharacter)
 {
+	if (!IsValid(InstigatorCharacter))
+	{
+		return;
+	}
+
+	ASGunBase* Gun = InstigatorCharacter->GetEquippedGun();
+	USkeletalMeshComponent* GunMesh = IsValid(Gun) ? Gun->GetGunMesh() : nullptr;
+	if (!IsValid(GunMesh) || !GunMesh->DoesSocketExist(GunMuzzleName))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot complete fire: invalid gun mesh or missing socket '%s'"), *GunMuzzleName.ToString());
+		StopAction(InstigatorCharacter);
+		return;
+	}
+
 	// try and fire a projectile
 	if (ensureAlways(ProjectileClass))
 	{
-		FVector MuzzleLocation = InstigatorCharacter->GetGunMesh()->GetSocketLocation(GunMuzzleName);
+		FVector MuzzleLocation = GunMesh->GetSocketLocation(GunMuzzleName);
 		FRotator MuzzleRotation = InstigatorCharacter->GetControlRotation();
 		
 		//Ray Check
@@ -111,6 +137,4 @@ void USAction_Fire::FireDelay_Elapsed(ASCharacter* InstigatorCharacter)
 	
 	StopAction(InstigatorCharacter);
 }
-
-
 

@@ -4,6 +4,7 @@
 #include "SAction.h"
 #include "SActionComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Stellar_Front/Stellar_Front.h"
 
 void USAction::Initialize(USActionComponent* NewActionComp)
 {
@@ -40,30 +41,35 @@ bool USAction::CanStart_Implementation(AActor* Instigator)
 //use Tag--demonstrate "the State of Action".
 void USAction::StartAction_Implementation(AActor* Instigator)
 {
-	UE_LOG(LogTemp, Log, TEXT("Running: %s"), *GetNameSafe(this));
+	//UE_LOG(LogTemp, Warning, TEXT("Running: %s"), *GetNameSafe(this));
 
 	USActionComponent* AC = GetOwningComponent();
 	AC->ActiveGameplaytags.AppendTags(GrantTags);
-	
+
+	LogOnScreen(this, FString::Printf(TEXT("Started: %s  [Tags: %s]"), *ActionName.ToString(), *AC->ActiveGameplaytags.ToStringSimple()), FColor::Green);
+
 	RepData.bIsRunning = true;
 	RepData.Instigator = Instigator;
-	
+
 	//server get Time_Start
 	//@fixme: to accomplish ACTION UI effect
 	TimeStarted = GetWorld()->GetTimeSeconds();
-	
+
 	GetOwningComponent()->OnActionStarted.Broadcast(AC,this);
 }
 
 void USAction::StopAction_Implementation(AActor* Instigator)
-{	
+{
 	UE_LOG(LogTemp, Log, TEXT("Stopped: %s"), *GetNameSafe(this));
-	
+
 	USActionComponent* AC = GetOwningComponent();
-	
+	AC->ActiveGameplaytags.RemoveTags(GrantTags);
+
+	LogOnScreen(this, FString::Printf(TEXT("Stopped: %s  [Tags: %s]"), *ActionName.ToString(), *AC->ActiveGameplaytags.ToStringSimple()), FColor::White);
+
 	RepData.bIsRunning = false;
 	RepData.Instigator = Instigator;
-	
+
 	GetOwningComponent()->OnActionStopped.Broadcast(AC,this);
 }	
 

@@ -2,6 +2,8 @@
 
 
 #include "SAnimInstance.h"
+#include "SGunBase.h"
+#include "SCharacter.h"
 #include "GameFramework/Character.h"
 
 
@@ -11,13 +13,33 @@ USAnimInstance::USAnimInstance()
 	SwaySpeed = 3.0f;
 }
 
+void USAnimInstance::NativeInitializeAnimation()
+{
+	Super::NativeInitializeAnimation();
+	// Gun = Cast<ASGunBase>(GetOwningActor());
+	// if (Gun)
+	// {
+	// 	Character = Cast<ASCharacter>(Gun->GetOwner());
+	// }
+	
+}
+
 void USAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 
+	// ASCharacter* Pawn = Cast<ASCharacter>(TryGetPawnOwner());
+	// if (Character)
+	// {
+	// 	MoveXX = Character->GetMoveX();
+	// 	MoveYY = Character->GetMoveY();
+	// }
+	
 	// The weapon sway itself is applied to a specific bone in the AnimationBlueprint
 	CalcWeaponSway(DeltaSeconds);
 }
+
+
 
 void USAnimInstance::CalcWeaponSway(float DeltaTime)
 {
@@ -46,4 +68,3 @@ void USAnimInstance::CalcWeaponSway(float DeltaTime)
 	InputDirection = InputDirection * FVector(-0.50f, -0.55, 1.0f) * 6.0f;
 	SwayDeltaTranslation = FMath::Lerp(SwayDeltaTranslation, InputDirection, DeltaTime * SwaySpeed);
 }
-

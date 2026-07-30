@@ -15,8 +15,9 @@ class STELLAR_FRONT_API USAction_Sprint : public USAction
 	GENERATED_BODY()
 	
 protected:
-	float BonusSpeed;
-	
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float SprintSpeed = 900.0f;
+
 public:
 	void StartAction_Implementation(AActor* Instigator) override;
 	void StopAction_Implementation(AActor* Instigator) override;
