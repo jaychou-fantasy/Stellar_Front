@@ -10,9 +10,7 @@
 // Sets default values for this component's properties
 USActionComponent::USActionComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bCanEverTick = false;
 
 	SetIsReplicatedByDefault(true);
 }
@@ -49,19 +47,6 @@ void USActionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void USActionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	//just for debugging
-	for (USAction* Action : Actions)
-	{
-		FColor TextColor = Action->IsRunning() ? FColor::Blue : FColor::White;
-		FString ActionMsg = FString::Printf(TEXT("[%s] Action: %s : IsRunning: %s"),*GetNameSafe(GetOwner()),*Action->ActionName.ToString(),Action->IsRunning() ? TEXT("true") : TEXT("false"));
-		//@fixme:LogOnScreen
-		//LogOnScreen(this, ActionMsg, TextColor, 0.0f);
-	}
-}
-
 void USActionComponent::ServerStartActionByName_Implementation(AActor* Instigator, FName ActionName)
 {
 	StartActionByName(Instigator,ActionName);
@@ -71,7 +56,6 @@ void USActionComponent::ServerStopActionByName_Implementation(AActor* Instigator
 {
 	StopActionByName(Instigator,ActionName);
 }
-
 
 void USActionComponent::AddActionFromClass(AActor* Instigator, TSubclassOf<USAction> ActionClass)
 {

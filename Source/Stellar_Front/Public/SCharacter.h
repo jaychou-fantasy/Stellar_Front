@@ -4,23 +4,21 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-
-// Included for struct FInputActionInstance (Enhanced Input)
-#include "InputAction.h"
-#include "SGunBase.h"
 #include "SCharacter.generated.h"
 
 class UInputMappingContext;
 class UInputComponent;
+class UInputAction;
 class USkeletalMeshComponent;
 class UCameraComponent;
-class ASProjectileBase;
+class ASGunBase;
 class USoundBase;
 class UAnimSequence;
 class UParticleSystem;
 class USAttributeComponent;
 class USActionComponent;
 class USInteractionComponent;
+struct FInputActionValue;
 
 
 UENUM(BlueprintType)
@@ -49,10 +47,10 @@ protected:
 	float MoveY = 0.0f;
 
 	UPROPERTY(EditAnywhere,Category = "Movement")
-	float NormalMouseSensitivity = 1.0;
+	float NormalMouseSensitivity = 0.7f;
 	
 	UPROPERTY(EditAnywhere,Category = "Movement")
-	float AimMouseSensitivity = 0.4;
+	float AimMouseSensitivity = 0.4f;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "State")
 	ESCharacterState CharacterState = ESCharacterState::Idle;
@@ -123,12 +121,16 @@ public:
 
 	virtual void OnJumped_Implementation() override;
 
-
+	void PostInitializeComponents() override;
+	
+	void BeginPlay() override;
+	
 protected:
 	void SpawnWeapon();
 	
 	/** Fires a projectile. */
-	void Fire();
+	void StartFire();
+	void StopFire();
 
 	void StartAim();
 	void StopAim();
@@ -139,6 +141,7 @@ protected:
 	void MoveInput(const FInputActionValue& InputValue);
 	void StopMove();
 	void UpdateCharacterState();
+	float UpdateSensitivity();
 
 	void LookInput(const FInputActionValue& InputValue);
 
@@ -173,7 +176,4 @@ public:
 
 	virtual FVector GetPawnViewLocation() const override;
 	
-	void PostInitializeComponents() override;
-	
-	void BeginPlay() override;
 };

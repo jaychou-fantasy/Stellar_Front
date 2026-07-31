@@ -2,13 +2,12 @@
 
 
 #include "SGunBase.h"
+#include "SCharacter.h"
 
 // Sets default values
 ASGunBase::ASGunBase()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-
+	PrimaryActorTick.bCanEverTick = false;
 	
 	// Create a gun mesh component
 	GunMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FP_Gun"));
@@ -36,22 +35,36 @@ ASGunBase::ASGunBase()
 	Sight->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-FVector ASGunBase::GetAimSocketLocation() 
+bool ASGunBase::HasAmmo() const
 {
-	AimSocketLocation =  GunMeshComponent->GetSocketLocation(TEXT("AimSocket"));
-	return AimSocketLocation;
+	return RestAmmo > 0;
 }
 
-// Called when the game starts or when spawned
+FVector ASGunBase::GetAimSocketLocation() const
+{
+	return GunMeshComponent->GetSocketLocation(TEXT("AimSocket"));
+}
+
+const FWeaponFireAnimation& ASGunBase::GetFireAnimation(ESCharacterState State, bool bIsAiming) const
+{
+	if (bIsAiming)
+	{
+		return AimFire;
+	}
+	switch (State)
+	{
+		case ESCharacterState::Walk:   //use the same fire anim montage as SPRINT
+		case ESCharacterState::Sprint:
+			return SprintFire;
+		case ESCharacterState::Idle:
+		default:
+			return IdleFire;
+	}
+}
+
 void ASGunBase::BeginPlay()
 {
 	Super::BeginPlay();
+	RestAmmo = Ammo;
 	
-}
-
-// Called every frame
-void ASGunBase::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
 }

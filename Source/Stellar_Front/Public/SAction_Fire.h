@@ -6,8 +6,7 @@
 #include "SAction.h"
 #include "SAction_Fire.generated.h"
 
-class UParticleSystem;
-class ASProjectileBase;
+class ASCharacter;
 
 /**
  * 
@@ -19,34 +18,15 @@ class STELLAR_FRONT_API USAction_Fire : public USAction
 public:
 	USAction_Fire();
 	
+	bool CanStart_Implementation(AActor* Instigator) override;
 	virtual void StartAction_Implementation(AActor* Instigator) override;
+	virtual void StopAction_Implementation(AActor* Instigator) override;
 	
 protected:
-	/** Projectile class to spawn */
-	UPROPERTY(EditDefaultsOnly, Category="Fire")
-	TSubclassOf<ASProjectileBase> ProjectileClass;
-
-	/** Sound to play each time we fire */
-	UPROPERTY(EditDefaultsOnly, Category="Fire")
-	USoundBase* FireSound;
-
-	/** AnimMontage to play each time we fire */
-	UPROPERTY(EditDefaultsOnly, Category = "Fire")
-	UAnimSequence* FireAnimation;//----just an mp4 file  || while AnimMontage is actually a mp4_control_system 
-	//UAnimMontage* FireAnimation;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
-	UParticleSystem* MuzzleFlash;
-	
-	UPROPERTY(EditAnywhere,Category = "Fire")
-	float FireAnimDelay;
-	
 	UPROPERTY(VisibleAnywhere,Category = "Fire")
 	FName GunMuzzleName;
 	
-	UPROPERTY(VisibleAnywhere,Category = "Fire")
-	FName ArmSlotName;
-	
+	FTimerHandle TimerHandle_FireDelay;
 	UFUNCTION()
-	void FireDelay_Elapsed(ASCharacter* InstigatorCharacter);
+	void FireDelay_Elapsed(ASCharacter* InstigatorCharacter,bool bIsAiming);
 };

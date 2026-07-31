@@ -9,13 +9,9 @@
 #include "SAttributeComponent.h"
 #include "SGunBase.h"
 #include "SInteractionComponent.h"
-#include "SProjectileBase.h"
-#include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Kismet/GameplayStatics.h"
-#include "Animation/AnimSequence.h"
 
 
 ASCharacter::ASCharacter()
@@ -55,6 +51,19 @@ void ASCharacter::BeginPlay()
 	SpawnWeapon();
 }
 
+float ASCharacter::UpdateSensitivity()
+{
+	FGameplayTag AimTag = FGameplayTag::RequestGameplayTag("Status.Aim");
+	if (ActionComp->ActiveGameplaytags.HasTag(AimTag))
+	{
+		return AimMouseSensitivity;
+	}
+	else
+	{
+		return NormalMouseSensitivity;
+	}
+}
+
 
 FVector ASCharacter::GetPawnViewLocation() const
 {
@@ -72,7 +81,10 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 
 	// Jump exists in the base class, we don't need our own function
 	EnhancedInputComponent->BindAction(Input_Jump, ETriggerEvent::Triggered, this, &ACharacter::Jump);
-	EnhancedInputComponent->BindAction(Input_Fire, ETriggerEvent::Triggered, this, &ASCharacter::Fire);
+	
+	EnhancedInputComponent->BindAction(Input_Fire, ETriggerEvent::Started, this, &ASCharacter::StartFire);
+	EnhancedInputComponent->BindAction(Input_Fire, ETriggerEvent::Completed, this, &ASCharacter::StopFire);
+
 	EnhancedInputComponent->BindAction(Input_Aim, ETriggerEvent::Started, this, &ASCharacter::StartAim);
 	EnhancedInputComponent->BindAction(Input_Aim, ETriggerEvent::Completed, this, &ASCharacter::StopAim);
 
@@ -152,11 +164,15 @@ void ASCharacter::SpawnWeapon()
 }
 
 
-void ASCharacter::Fire()
+void ASCharacter::StartFire()
 {
 	ActionComp->StartActionByName(this,"Fire");
 }
 
+void ASCharacter::StopFire()
+{
+	ActionComp->StopActionByName(this,"Fire");
+}
 
 
 void ASCharacter::StartAim()
@@ -230,8 +246,9 @@ void ASCharacter::LookInput(const FInputActionValue& InputValue)
 	// Combined input from look up/down (X) and left/right (Y)
 	FVector2d LookValue = InputValue.Get<FVector2d>();
 
-	AddControllerYawInput(LookValue.X * NormalMouseSensitivity);
-	AddControllerPitchInput(LookValue.Y * NormalMouseSensitivity);
+	float MouseSens = UpdateSensitivity();
+	AddControllerYawInput(LookValue.X * MouseSens);
+	AddControllerPitchInput(LookValue.Y * MouseSens);
 }
 
 void ASCharacter::PrimaryInteract(const FInputActionValue& InputValue)
