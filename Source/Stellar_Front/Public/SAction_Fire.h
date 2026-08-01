@@ -6,7 +6,7 @@
 #include "SAction.h"
 #include "SAction_Fire.generated.h"
 
-class ASCharacter;
+class APawn;
 
 /**
  * 
@@ -28,5 +28,5 @@ protected:
 	
 	FTimerHandle TimerHandle_FireDelay;
 	UFUNCTION()
-	void FireDelay_Elapsed(ASCharacter* InstigatorCharacter,bool bIsAiming);
+	void FireDelay_Elapsed(APawn* InstigatorPawn, bool bIsAiming);
 };

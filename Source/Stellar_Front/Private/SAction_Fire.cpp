@@ -71,14 +71,21 @@ void USAction_Fire::StartAction_Implementation(AActor* Instigator)
 }
 
 
-void USAction_Fire::FireDelay_Elapsed(ASCharacter* InstigatorCharacter,bool bIsAiming)
+void USAction_Fire::FireDelay_Elapsed(APawn* InstigatorPawn, bool bIsAiming)
 {
+	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
 	if (!IsValid(InstigatorCharacter))
 	{
+		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_FireDelay);
 		return;
 	}
 
 	ASGunBase* Gun = InstigatorCharacter->GetEquippedGun();
+	if (!IsValid(Gun) || !Gun->HasAmmo())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_FireDelay);
+		return;
+	}
 	USkeletalMeshComponent* GunMesh = IsValid(Gun) ? Gun->GetGunMesh() : nullptr;
 	USkeletalMeshComponent* Mesh1P = InstigatorCharacter->GetArm();
 
@@ -110,6 +117,8 @@ void USAction_Fire::FireDelay_Elapsed(ASCharacter* InstigatorCharacter,bool bIsA
 		UGameplayStatics::PlaySound2D(this,FireSound);
 		//UGameplayStatics::PlaySoundAtLocation(this, FireSound, InstigatorCharacter->GetActorLocation());//they are in the same location,no need to get gun location
 	}
+	//spawn casing
+	Gun->SpawnCasing();
 
 	
 	// try and fire a projectile
@@ -167,6 +176,8 @@ void USAction_Fire::FireDelay_Elapsed(ASCharacter* InstigatorCharacter,bool bIsA
 
 		GetWorld()->SpawnActor<ASProjectileBase>(ProjectileClass, SpawnMT, ActorSpawnParams);
 	}
+	//Fire a bullet then "RestAmmo minus 1"
+	Gun->WeaponFire(InstigatorPawn);
 	
 	//StopAction(InstigatorCharacter);
 }

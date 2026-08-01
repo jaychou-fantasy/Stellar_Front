@@ -3,6 +3,7 @@
 
 #include "SGunBase.h"
 #include "SCharacter.h"
+#include "SGunCasing.h"
 
 // Sets default values
 ASGunBase::ASGunBase()
@@ -35,9 +36,41 @@ ASGunBase::ASGunBase()
 	Sight->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
+void ASGunBase::WeaponFire(APawn* InstigatorPawn)
+{
+	ASCharacter* Character = Cast<ASCharacter>(InstigatorPawn);	
+	if (Character)
+	{
+		//use recoil
+		Character->AddControllerPitchInput(VerticalRecoil);
+		Character->AddControllerYawInput(FMath::RandRange(-HorizontalRecoil,HorizontalRecoil));
+		
+		ConsumeAmmo();
+	}
+	
+}
+
+void ASGunBase::SpawnCasing()
+{
+	FActorSpawnParameters SpawnParams;
+	FTransform Transform = GunMeshComponent->GetSocketTransform(TEXT("Casing"));
+	
+	GetWorld()->SpawnActor<ASGunCasing>(CasingClass,Transform,SpawnParams);
+}
+
 bool ASGunBase::HasAmmo() const
 {
 	return RestAmmo > 0;
+}
+
+void ASGunBase::UpdateAmmo(int32 NewAmmoNumber)
+{
+	Ammo = NewAmmoNumber;
+}
+
+void ASGunBase::ConsumeAmmo()
+{
+	RestAmmo--;
 }
 
 FVector ASGunBase::GetAimSocketLocation() const

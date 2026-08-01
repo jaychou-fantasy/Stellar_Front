@@ -158,7 +158,6 @@ void ASCharacter::SpawnWeapon()
 	if (IsValid(SpawnedGun))
 	{
 		EquippedGun = SpawnedGun;
-
 		EquippedGun->AttachToComponent(ArmComponent,FAttachmentTransformRules::SnapToTargetIncludingScale);
 	}
 }

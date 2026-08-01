@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "SGunBase.generated.h"
 
+class ASGunCasing;
 class UAnimMontage;
 class UParticleSystem;
 class USoundBase;
@@ -37,6 +38,12 @@ class STELLAR_FRONT_API ASGunBase : public AActor
 	
 public:	
 	ASGunBase();
+	
+	UFUNCTION(BlueprintCallable)
+	void WeaponFire(APawn* InstigatorPawn);
+	
+	UFUNCTION()
+	void SpawnCasing();
 
 	/** Returns the skeletal mesh that belongs to this weapon. */
 	
@@ -84,17 +91,31 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
 	UStaticMeshComponent* Sight;
 	
+	UPROPERTY(EditAnywhere, Category = "Fire")
+	TSubclassOf<ASGunCasing> CasingClass;
 	
 	//fire properties
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Weapon")
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Fire")
 	int32 Ammo;
+	
+	UFUNCTION(BlueprintCallable)//used for Magazines of different volumn
+	void UpdateAmmo(int32 NewAmmoNumber);
+	
+	UFUNCTION(BlueprintCallable)
+	void ConsumeAmmo();
 	
 	UPROPERTY(BlueprintReadOnly)
 	int32 RestAmmo;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
 	float FireRate;
-
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	float VerticalRecoil;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	float HorizontalRecoil;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
 	TSubclassOf<ASProjectileBase> ProjectileClass;
 
