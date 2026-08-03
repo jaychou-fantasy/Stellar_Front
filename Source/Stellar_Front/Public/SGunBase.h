@@ -31,6 +31,7 @@ struct FWeaponFireAnimation
 	UAnimMontage* WeaponMontage = nullptr;
 };
 
+
 UCLASS(Abstract)
 class STELLAR_FRONT_API ASGunBase : public AActor
 {
@@ -39,20 +40,31 @@ class STELLAR_FRONT_API ASGunBase : public AActor
 public:	
 	ASGunBase();
 	
+	void PlayKakeSound();
+	
 	UFUNCTION(BlueprintCallable)
 	void WeaponFire(APawn* InstigatorPawn, bool bIsAiming);
 	
 	UFUNCTION()
 	void SpawnCasing();
+	
+	UFUNCTION(BlueprintCallable)
+	void WeaponReload(APawn* InstigatorPawn);
 
-	/** Returns the skeletal mesh that belongs to this weapon. */
+	/** Returns 1*/
+	UFUNCTION(BlueprintCallable)
+	bool MagHasAmmo() const;
 	
 	UFUNCTION(BlueprintCallable)
-	bool HasAmmo() const;
+	bool TotalHasAmmo() const;
 	
 	UFUNCTION(BlueprintCallable)
-	int32 GetRestAmmo() const { return RestAmmo; };
+	int32 GetRestMagAmmo() const { return MagRestAmmo; };
 	
+	UFUNCTION(BlueprintCallable)
+	int32 GetMagSize() const { return MagSize; };
+	
+	/** Returns 2*/
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	USkeletalMeshComponent* GetGunMesh() const { return GunMeshComponent; }
 	UStaticMeshComponent* GetBarrel() const { return Barrel; }
@@ -94,19 +106,33 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Fire")
 	TSubclassOf<ASGunCasing> CasingClass;
 	
-	//fire properties
+	//Ammo
+	UPROPERTY(EditDefaultsOnly,Category = "Fire")
+	USoundBase* KaKeSound;
+	
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Fire")
-	int32 Ammo;
+	int32 TotalAmmo;
 	
-	UFUNCTION(BlueprintCallable)//used for Magazines of different volumn
-	void UpdateAmmo(int32 NewAmmoNumber);
-	
-	UFUNCTION(BlueprintCallable)
-	void ConsumeAmmo();
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Fire")
+	int32 MagSize;
 	
 	UPROPERTY(BlueprintReadOnly)
-	int32 RestAmmo;
+	int32 MagRestAmmo;
 	
+	UFUNCTION(BlueprintCallable)//used for Magazines of different volumn
+	void UpdateMagSize(int32 NewAmmoNumber);
+	
+	UFUNCTION()
+	void ConsumeMagAmmo();
+	
+	UFUNCTION()
+	void ConsumeTotalAmmo(int32 Delta);
+	
+	UFUNCTION(BlueprintCallable)
+	void ReloadAmmo();
+	
+	
+	//Fire
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
 	float FireRate;
 	
@@ -116,29 +142,39 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
 	float HorizontalRecoil;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	UPROPERTY(EditDefaultsOnly, Category = "Fire")
 	TSubclassOf<ASProjectileBase> ProjectileClass;
 
 	UPROPERTY(VisibleAnywhere, Category = "Fire")
 	FName GunMuzzleName;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	UPROPERTY(EditDefaultsOnly, Category = "Fire")
 	UMetaSoundSource* FireSound;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	UPROPERTY(EditDefaultsOnly, Category = "Fire")
+	USoundBase* ReloadSound;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Fire")
 	UNiagaraSystem* MuzzleFlash;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	UPROPERTY(EditDefaultsOnly, Category = "Fire")
 	UNiagaraSystem* OnHitFlash;
 	
 	//fire anim montage
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
 	FWeaponFireAnimation IdleFire;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
 	FWeaponFireAnimation SprintFire;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	UPROPERTY(EditDefaultsOnly, Category = "Animation")
 	FWeaponFireAnimation AimFire;
+	
+	
+	//reload anim montage
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Animation")
+	UAnimMontage* WeaponReloadAnim = nullptr;
 
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Animation")
+	UAnimMontage* ArmReloadAnim = nullptr;
 };

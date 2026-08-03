@@ -45,8 +45,6 @@ void ASCharacter::PostInitializeComponents()
 void ASCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	UE_LOG(LogTemp, Warning, TEXT("Arm has Head socket: %d"), ArmComponent->DoesSocketExist(TEXT("Head")));
-	UE_LOG(LogTemp, Warning, TEXT("Camera parent socket: %s"), *CameraComponent->GetAttachSocketName().ToString());
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 	SpawnWeapon();
 }
@@ -58,10 +56,7 @@ float ASCharacter::UpdateSensitivity()
 	{
 		return AimMouseSensitivity;
 	}
-	else
-	{
-		return NormalMouseSensitivity;
-	}
+	return NormalMouseSensitivity;
 }
 
 
@@ -91,6 +86,7 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	EnhancedInputComponent->BindAction(Input_Sprint,ETriggerEvent::Started,this,&ASCharacter::StartSprint);
 	EnhancedInputComponent->BindAction(Input_Sprint,ETriggerEvent::Completed,this,&ASCharacter::StopSprint);
 
+	EnhancedInputComponent->BindAction(Input_Reload,ETriggerEvent::Started,this,&ASCharacter::Reload);
 
 	EnhancedInputComponent->BindAction(Input_Interact,ETriggerEvent::Triggered,this,&ASCharacter::PrimaryInteract);
 
@@ -198,6 +194,10 @@ void ASCharacter::StopSprint()
 	UpdateCharacterState();
 }
 
+void ASCharacter::Reload()
+{
+	ActionComp->StartActionByName(this,"Reload");
+}
 
 
 void ASCharacter::MoveInput(const FInputActionValue& InputValue)

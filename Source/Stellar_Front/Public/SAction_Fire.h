@@ -16,9 +16,8 @@ class STELLAR_FRONT_API USAction_Fire : public USAction
 {
 	GENERATED_BODY()
 public:
-	USAction_Fire();
 	
-	bool CanStart_Implementation(AActor* Instigator) override;
+	virtual bool CanStart_Implementation(AActor* Instigator) override;
 	virtual void StartAction_Implementation(AActor* Instigator) override;
 	virtual void StopAction_Implementation(AActor* Instigator) override;
 	

@@ -82,6 +82,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category= "Input")
 	UInputAction* Input_Sprint;
 	
+	UPROPERTY(EditDefaultsOnly, Category= "Input")
+	UInputAction* Input_Reload;
+	
 	
 	/** Pawn mesh: 1st person view  */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mesh")
@@ -137,6 +140,8 @@ protected:
 
 	void StartSprint();
 	void StopSprint();
+	
+	void Reload();
 
 	void MoveInput(const FInputActionValue& InputValue);
 	void StopMove();

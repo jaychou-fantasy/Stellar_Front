@@ -42,6 +42,11 @@ ASGunBase::ASGunBase()
 	Sight->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
+void ASGunBase::PlayKakeSound()
+{
+	UGameplayStatics::PlaySoundAtLocation(this,KaKeSound,GetOwner()->GetActorLocation());
+}
+
 void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 {
 	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
@@ -129,7 +134,7 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 		InstigatorCharacter->AddControllerPitchInput(VerticalRecoil);
 		InstigatorCharacter->AddControllerYawInput(FMath::RandRange(-HorizontalRecoil,HorizontalRecoil));
 
-		ConsumeAmmo();
+		ConsumeMagAmmo();
 	}
 	
 }
@@ -142,20 +147,67 @@ void ASGunBase::SpawnCasing()
 	GetWorld()->SpawnActor<ASGunCasing>(CasingClass,Transform,SpawnParams);
 }
 
-bool ASGunBase::HasAmmo() const
+void ASGunBase::WeaponReload(APawn* InstigatorPawn)
 {
-	return RestAmmo > 0;
+	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
+	if (InstigatorCharacter)
+	{
+		USkeletalMeshComponent* Mesh1P = InstigatorCharacter->GetArm();
+		
+		UAnimInstance* ArmAnim = Mesh1P->GetAnimInstance();
+		UAnimInstance* GunAnim = GunMeshComponent->GetAnimInstance();
+		ArmAnim->Montage_Play(ArmReloadAnim);
+		GunAnim->Montage_Play(WeaponReloadAnim);
+		
+		UGameplayStatics::PlaySoundAtLocation(this,ReloadSound,InstigatorCharacter->GetActorLocation());
+		
+		//Set Ammo in AnimNotify---in UE Editor
+		//ReloadAmmo();
+	}
 }
 
-void ASGunBase::UpdateAmmo(int32 NewAmmoNumber)
+void ASGunBase::ReloadAmmo()
 {
-	Ammo = NewAmmoNumber;
+	int32 ActualBulletToReload = MagSize - MagRestAmmo;
+	if (ActualBulletToReload < TotalAmmo)
+	{
+		MagRestAmmo = MagSize;//or just ---- MagRestAmmo += ActualBulletToReload
+		ConsumeTotalAmmo(ActualBulletToReload);
+	}
+	else//the case like,Total Ammo=3,but MagRestAmmo = 10(while MagSize = 30)
+	{
+		MagRestAmmo += TotalAmmo;
+		TotalAmmo = 0;
+	}
 }
 
-void ASGunBase::ConsumeAmmo()
+
+bool ASGunBase::MagHasAmmo() const
 {
-	RestAmmo--;
+	return MagRestAmmo > 0;
 }
+
+bool ASGunBase::TotalHasAmmo() const
+{
+	return TotalAmmo > 0;
+}
+
+void ASGunBase::UpdateMagSize(int32 NewAmmoNumber)
+{
+	MagSize = NewAmmoNumber;
+}
+
+void ASGunBase::ConsumeMagAmmo()
+{
+	MagRestAmmo--;
+}
+
+void ASGunBase::ConsumeTotalAmmo(int32 Delta)
+{
+	TotalAmmo -= Delta;
+}
+
+
 
 FVector ASGunBase::GetAimSocketLocation() const
 {
@@ -182,6 +234,7 @@ const FWeaponFireAnimation& ASGunBase::GetFireAnimation(ESCharacterState State, 
 void ASGunBase::BeginPlay()
 {
 	Super::BeginPlay();
-	RestAmmo = Ammo;
+	//initialize the MagRestAmmo<--->MagSize
+	MagRestAmmo = MagSize;
 	
 }

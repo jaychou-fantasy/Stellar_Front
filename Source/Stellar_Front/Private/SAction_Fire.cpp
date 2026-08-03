@@ -6,9 +6,7 @@
 #include "SCharacter.h"
 #include "SGunBase.h"
 
-USAction_Fire::USAction_Fire()
-{
-}
+
 
 bool USAction_Fire::CanStart_Implementation(AActor* Instigator)
 {
@@ -16,10 +14,13 @@ bool USAction_Fire::CanStart_Implementation(AActor* Instigator)
 	if (Character)
 	{
 		ASGunBase* Gun = Character->GetEquippedGun();
-		if (Gun && Gun->HasAmmo() && Super::CanStart_Implementation(Instigator))
+		//check first time 
+		if (Gun && Gun->MagHasAmmo() && Super::CanStart_Implementation(Instigator))
 		{
 			return true;
 		}
+		//play "Ka Ke" sound like no bullet in that gun
+		Gun->PlayKakeSound();
 	}
 	return false;
 }
@@ -66,14 +67,16 @@ void USAction_Fire::StartAction_Implementation(AActor* Instigator)
 void USAction_Fire::FireDelay_Elapsed(APawn* InstigatorPawn, bool bIsAiming)
 {
 	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
-	if (!IsValid(InstigatorCharacter))
+	//check second time here. To prevent firing without Any Ammo during Shooting process
+	if (!IsValid(InstigatorCharacter) || !InstigatorCharacter->GetEquippedGun()->MagHasAmmo())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_FireDelay);
+		StopAction(InstigatorPawn);
 		return;
 	}
 
 	ASGunBase* Gun = InstigatorCharacter->GetEquippedGun();
-	if (!IsValid(Gun) || !Gun->HasAmmo())
+	if (!IsValid(Gun) || !Gun->MagHasAmmo())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_FireDelay);
 		return;
