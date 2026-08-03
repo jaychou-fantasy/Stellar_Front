@@ -23,9 +23,6 @@ public:
 	virtual void StopAction_Implementation(AActor* Instigator) override;
 	
 protected:
-	UPROPERTY(VisibleAnywhere,Category = "Fire")
-	FName GunMuzzleName;
-	
 	FTimerHandle TimerHandle_FireDelay;
 	UFUNCTION()
 	void FireDelay_Elapsed(APawn* InstigatorPawn, bool bIsAiming);

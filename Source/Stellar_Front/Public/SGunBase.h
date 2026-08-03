@@ -40,7 +40,7 @@ public:
 	ASGunBase();
 	
 	UFUNCTION(BlueprintCallable)
-	void WeaponFire(APawn* InstigatorPawn);
+	void WeaponFire(APawn* InstigatorPawn, bool bIsAiming);
 	
 	UFUNCTION()
 	void SpawnCasing();
@@ -119,11 +119,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
 	TSubclassOf<ASProjectileBase> ProjectileClass;
 
+	UPROPERTY(VisibleAnywhere, Category = "Fire")
+	FName GunMuzzleName;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
 	UMetaSoundSource* FireSound;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
 	UNiagaraSystem* MuzzleFlash;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	UNiagaraSystem* OnHitFlash;
 	
 	//fire anim montage
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")

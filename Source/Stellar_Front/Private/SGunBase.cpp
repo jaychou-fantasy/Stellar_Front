@@ -4,11 +4,17 @@
 #include "SGunBase.h"
 #include "SCharacter.h"
 #include "SGunCasing.h"
+#include "SProjectileBase.h"
+#include "Animation/AnimInstance.h"
+#include "Kismet/GameplayStatics.h"
+#include "MetasoundSource.h"
+#include "NiagaraFunctionLibrary.h"
 
 // Sets default values
 ASGunBase::ASGunBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	GunMuzzleName = "Muzzle";
 	
 	// Create a gun mesh component
 	GunMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FP_Gun"));
@@ -36,15 +42,93 @@ ASGunBase::ASGunBase()
 	Sight->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-void ASGunBase::WeaponFire(APawn* InstigatorPawn)
+void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 {
-	ASCharacter* Character = Cast<ASCharacter>(InstigatorPawn);	
-	if (Character)
+	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
+	if (InstigatorCharacter)
 	{
+		USkeletalMeshComponent* Mesh1P = InstigatorCharacter->GetArm();
+
+		// Get the animation object for the arms mesh
+		//aim fire
+		//idle fire
+		//sprint | walk fire
+		//Play Arm|Weapon Animation && Play Muzzle FX
+		UAnimInstance* ArmAnim = Mesh1P->GetAnimInstance();
+		UAnimInstance* GunAnim = GunMeshComponent->GetAnimInstance();
+		const FWeaponFireAnimation& FireAnimation = GetFireAnimation(InstigatorCharacter->GetCharacterState(),bIsAiming);
+
+		if (ArmAnim && GunAnim)
+		{
+			UAnimMontage* ArmMontage = FireAnimation.ArmMontage;
+			UAnimMontage* WeaponMontage = FireAnimation.WeaponMontage;
+
+			ArmAnim->Montage_Play(ArmMontage);
+			GunAnim->Montage_Play(WeaponMontage);
+		}
+		//spawn emitter
+		if (MuzzleFlash)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAttached(MuzzleFlash,Barrel,TEXT("Muzzle"),FVector::ZeroVector,FRotator::ZeroRotator,EAttachLocation::KeepRelativeOffset,true);
+		}
+		//play meta sound
+		if (FireSound)
+		{
+			UGameplayStatics::PlaySound2D(this,FireSound);
+			//UGameplayStatics::PlaySoundAtLocation(this, FireSound, InstigatorCharacter->GetActorLocation());//they are in the same location,no need to get gun location
+		}
+		//spawn casing
+		SpawnCasing();
+
+		// try and fire a projectile
+		if (ensureAlways(ProjectileClass))
+		{
+			FVector MuzzleLocation = GunMeshComponent->GetSocketLocation(GunMuzzleName);
+			FRotator MuzzleRotation = InstigatorCharacter->GetControlRotation();
+
+			//Ray Check
+			FHitResult Hit;
+			FVector TraceStart = InstigatorCharacter->GetPawnViewLocation();//override as "Camera Comp's ViewLocations"
+			FVector TraceEnd = TraceStart + MuzzleRotation.Vector() * 5000;
+
+			FCollisionObjectQueryParams ObjectQueryParams;
+			ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+			ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
+			ObjectQueryParams.AddObjectTypesToQuery(ECC_Pawn);
+
+			FCollisionShape CollisionShape;
+			CollisionShape.SetSphere(ProjectileClass->GetDefaultObject<ASProjectileBase>()->GetSphereRadius());//GetDefaultObject----> Cast "UClass*" to "ASprojectileBase*"
+
+			FCollisionQueryParams CollisionQueryParams;
+			CollisionQueryParams.AddIgnoredActor(InstigatorCharacter);
+
+			if (GetWorld()->SweepSingleByObjectType(Hit,TraceStart,TraceEnd,FQuat::Identity,ObjectQueryParams,CollisionShape,CollisionQueryParams))
+			{
+				TraceEnd = Hit.ImpactPoint;
+			}
+
+			FRotator ProjRotation;
+			// Fall back since we failed to find any blocking hit
+			// Settle for a slightly less accurate direction as a fallback(tui er qiu qi ci)
+			ProjRotation = FRotationMatrix::MakeFromX(TraceEnd - MuzzleLocation).Rotator();
+			/*Takes your provided XAxis as the local forward direction of the object
+			  Automatically calculates a suitable Y and Z axis (ensures an orthonormal basis)
+			  Finally generates an FRotationMatrix (rotation matrix)*/
+
+			//Begin Spawn  Projectile at the Muzzle
+			FTransform SpawnMT = FTransform(ProjRotation , MuzzleLocation);//combine Location w/ Rotation
+			//Set Spawn Collision Handling Override
+			FActorSpawnParameters ActorSpawnParams;
+			ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;// can be nullptr if colliding with wall or sth.
+			ActorSpawnParams.Instigator = InstigatorCharacter;
+
+			GetWorld()->SpawnActor<ASProjectileBase>(ProjectileClass, SpawnMT, ActorSpawnParams);
+		}
+
 		//use recoil
-		Character->AddControllerPitchInput(VerticalRecoil);
-		Character->AddControllerYawInput(FMath::RandRange(-HorizontalRecoil,HorizontalRecoil));
-		
+		InstigatorCharacter->AddControllerPitchInput(VerticalRecoil);
+		InstigatorCharacter->AddControllerYawInput(FMath::RandRange(-HorizontalRecoil,HorizontalRecoil));
+
 		ConsumeAmmo();
 	}
 	
