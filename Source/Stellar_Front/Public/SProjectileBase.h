@@ -27,7 +27,7 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly,Category = "Damage")
-	float SphereRadius = 20.0f;
+	float SphereRadius = 1.0f;
 	
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Damage")
 	float DamageAmount;

@@ -9,7 +9,7 @@
 
 ASProj_NormalBullet::ASProj_NormalBullet()
 {
-	SphereComp->SetSphereRadius(20.0f);
+	SphereComp->SetSphereRadius(1.0f);
 	SphereComp->OnComponentHit.RemoveDynamic(this, &ASProj_NormalBullet::OnActorHit);
 	SphereComp->OnComponentHit.AddDynamic(this, &ASProj_NormalBullet::OnProjectileHit);
 	

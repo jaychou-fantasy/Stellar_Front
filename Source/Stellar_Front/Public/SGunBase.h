@@ -206,8 +206,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Hit Feedback")
 	FOnHitFlashSound WoodOnHit;
 
-	/** Spawns the shared bullet-hole actor, then applies this surface's material to its DecalComponent. */
-	void SpawnImpactDecal(const FHitResult& Hit, APawn* InstigatorPawn, UMaterialInterface* DecalMaterial, const FVector& DecalScale);
+	/** Spawns the shared bullet-hole actor at the trace end, then applies this surface's material. */
+	void SpawnImpactDecal(const FVector& SpawnLocation, const FRotator& SpawnRotation, UMaterialInterface* DecalMaterial, const FVector& DecalScale);
 	
 	//fire anim montage
 	UPROPERTY(EditDefaultsOnly, Category = "Animation")

@@ -56,11 +56,6 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
 	if (InstigatorCharacter)
 	{
-		//update UI
-		UMainWidget* MainUI = Cast<UMainWidget>(InstigatorCharacter->GetMainUI());
-		MainUI->UpdateAmmo(GetRestMagAmmo(),TotalAmmo);
-		
-		
 		USkeletalMeshComponent* Mesh1P = InstigatorCharacter->GetArm();
 
 		// Get the animation object for the arms mesh
@@ -129,6 +124,12 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 			{
 				TraceEnd = Hit.ImpactPoint;
 				ProjRotation = FRotationMatrix::MakeFromX(TraceEnd - MuzzleLocation).Rotator();
+				UE_LOG(LogTemp, Warning, TEXT("[FireTrace] HitActor=%s HitComponent=%s ImpactPoint=%s TraceEnd=%s ProjRotation=%s"),
+					*GetNameSafe(Hit.GetActor()),
+					*GetNameSafe(Hit.GetComponent()),
+					*Hit.ImpactPoint.ToCompactString(),
+					*TraceEnd.ToCompactString(),
+					*ProjRotation.ToCompactString());
 
 				const FOnHitFlashSound* HitFeedback = nullptr;
 				switch (UPhysicalMaterial::DetermineSurfaceType(Hit.PhysMaterial.Get()))
@@ -155,7 +156,8 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 
 				if (HitFeedback)
 				{
-					SpawnImpactDecal(Hit, InstigatorCharacter, HitFeedback->DecalMaterial, HitFeedback->DecalScale);
+					//Spawn decal
+					SpawnImpactDecal(TraceEnd, ProjRotation, HitFeedback->DecalMaterial, HitFeedback->DecalScale);
 
 					if (HitFeedback->OnHitFlash)
 					{
@@ -184,43 +186,45 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 		InstigatorCharacter->AddControllerPitchInput(-VerticalRecoil);
 		InstigatorCharacter->AddControllerYawInput(FMath::RandRange(-HorizontalRecoil,HorizontalRecoil));
 
+		//Consume Ammo
 		ConsumeMagAmmo();
+		//update UI
+		UMainWidget* MainUI = Cast<UMainWidget>(InstigatorCharacter->GetMainUI());
+		MainUI->UpdateAmmo(GetRestMagAmmo(),TotalAmmo);
 	}
 	
 }
 
-void ASGunBase::SpawnImpactDecal(const FHitResult& Hit, APawn* InstigatorPawn, UMaterialInterface* DecalMaterial, const FVector& DecalScale)
+void ASGunBase::SpawnImpactDecal(const FVector& SpawnLocation, const FRotator& SpawnRotation, UMaterialInterface* DecalMaterial, const FVector& DecalScale)
 {
 	if (!DecalActor || !DecalMaterial)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[ImpactDecal] Skipped: DecalActor=%s Material=%s"), *GetNameSafe(DecalActor), *GetNameSafe(DecalMaterial));
 		return;
 	}
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Instigator = InstigatorPawn;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	const FVector SpawnLocation = Hit.ImpactPoint + Hit.ImpactNormal;
-	const FRotator SpawnRotation = (-Hit.ImpactNormal).Rotation();
 	const FTransform SpawnTransform(SpawnRotation, SpawnLocation, DecalScale);
-	AActor* SpawnedDecal = GetWorld()->SpawnActor<AActor>(DecalActor, SpawnTransform, SpawnParams);
+	AActor* SpawnedDecal = GetWorld()->SpawnActor<AActor>(DecalActor, SpawnTransform);
 	if (!IsValid(SpawnedDecal))
 	{
 		return;
 	}
+	UE_LOG(LogTemp, Warning, TEXT("[ImpactDecal] Actor=%s RequestedLocation=%s ActorLocation=%s RequestedRotation=%s ActorRotation=%s Material=%s"),
+		*GetNameSafe(SpawnedDecal),
+		*SpawnLocation.ToCompactString(),
+		*SpawnedDecal->GetActorLocation().ToCompactString(),
+		*SpawnRotation.ToCompactString(),
+		*SpawnedDecal->GetActorRotation().ToCompactString(),
+		*GetNameSafe(DecalMaterial));
 
-	// WeaponFire runs on the server. Replicate the short-lived cosmetic actor to clients as well.
-	SpawnedDecal->SetReplicates(true);
-
-	if (UPrimitiveComponent* HitComponent = Hit.GetComponent())
-	{
-		SpawnedDecal->AttachToComponent(HitComponent, FAttachmentTransformRules::KeepWorldTransform);
-	}
-
+	//this component is in "BP_Decal"
 	if (UDecalComponent* DecalComponent = SpawnedDecal->FindComponentByClass<UDecalComponent>())
 	{
 		DecalComponent->SetDecalMaterial(DecalMaterial);
-		DecalComponent->SetWorldLocationAndRotation(SpawnLocation, SpawnRotation);
+		UE_LOG(LogTemp, Warning, TEXT("[ImpactDecal] Component=%s Location=%s Rotation=%s"),
+			*GetNameSafe(DecalComponent),
+			*DecalComponent->GetComponentLocation().ToCompactString(),
+			*DecalComponent->GetComponentRotation().ToCompactString());
 	}
 	else
 	{

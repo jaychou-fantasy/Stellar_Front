@@ -7,7 +7,7 @@
 
 ASProj_MagicBullet::ASProj_MagicBullet()
 {
-	SphereComp->SetSphereRadius(20.0f);
+	SphereComp->SetSphereRadius(1.0f);
 	SphereComp->OnComponentHit.RemoveDynamic(this, &ASProj_MagicBullet::OnActorHit);
 	SphereComp->OnComponentHit.AddDynamic(this, &ASProj_MagicBullet::OnProjectileHit);
 	
