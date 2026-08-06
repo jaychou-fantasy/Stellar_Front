@@ -16,12 +16,15 @@
 
 ASCharacter::ASCharacter()
 {
+	bUseControllerRotationPitch = true;
 	// Create a mesh component that will be used when being viewed from a '1st person' view (when controlling this pawn)
  	ArmComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CharacterMesh"));
  	ArmComponent->SetupAttachment(GetCapsuleComponent());
  	ArmComponent->CastShadow = false;
  	ArmComponent->SetRelativeRotation(FRotator(2.0f, -15.0f, 5.0f));
  	ArmComponent->SetRelativeLocation(FVector(0, 0, -160.0f));
+	
+	
 	
 	// Create a CameraComponent
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
@@ -46,7 +49,6 @@ void ASCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
-	SpawnWeapon();
 }
 
 float ASCharacter::UpdateSensitivity()

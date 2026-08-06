@@ -57,21 +57,12 @@ void ASProjectileBase::OnActorHit(UPrimitiveComponent* HitComp, AActor* OtherAct
 void ASProjectileBase::Explode_Implementation()
 {
 	//if (!this->IsPendingKillPending())
-	if (ImpactVFX)
-	{
-		UGameplayStatics::SpawnEmitterAtLocation(this, ImpactVFX, GetActorLocation(), FRotator::ZeroRotator, FVector(5.0f));
-	}
-	if (ImpactSound)
-	{
-		UGameplayStatics::PlaySoundAtLocation(this,ImpactSound,GetActorLocation());
-	}
 	if (ImpactShake)
 	{
 		UGameplayStatics::PlayWorldCameraShake(this,ImpactShake,GetActorLocation(),ImpactShakeInnerRadius,ImpactShakeOuterRadius);
 	}
 	
 	Destroy();
-	
 }
 
 

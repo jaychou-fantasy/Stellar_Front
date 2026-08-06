@@ -3,12 +3,16 @@
 
 #include "SGunBase.h"
 #include "SCharacter.h"
+#include "SPhysicalSurfaceTypes.h"
 #include "SGunCasing.h"
 #include "SProjectileBase.h"
 #include "Animation/AnimInstance.h"
+#include "Components/DecalComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
 #include "MetasoundSource.h"
 #include "NiagaraFunctionLibrary.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
 
 // Sets default values
 ASGunBase::ASGunBase()
@@ -52,6 +56,11 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
 	if (InstigatorCharacter)
 	{
+		//update UI
+		UMainWidget* MainUI = Cast<UMainWidget>(InstigatorCharacter->GetMainUI());
+		MainUI->UpdateAmmo(GetRestMagAmmo(),TotalAmmo);
+		
+		
 		USkeletalMeshComponent* Mesh1P = InstigatorCharacter->GetArm();
 
 		// Get the animation object for the arms mesh
@@ -106,11 +115,8 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 
 			FCollisionQueryParams CollisionQueryParams;
 			CollisionQueryParams.AddIgnoredActor(InstigatorCharacter);
-
-			if (GetWorld()->SweepSingleByObjectType(Hit,TraceStart,TraceEnd,FQuat::Identity,ObjectQueryParams,CollisionShape,CollisionQueryParams))
-			{
-				TraceEnd = Hit.ImpactPoint;
-			}
+			CollisionQueryParams.AddIgnoredActor(this);
+			CollisionQueryParams.bReturnPhysicalMaterial = true;
 
 			FRotator ProjRotation;
 			// Fall back since we failed to find any blocking hit
@@ -119,6 +125,50 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 			/*Takes your provided XAxis as the local forward direction of the object
 			  Automatically calculates a suitable Y and Z axis (ensures an orthonormal basis)
 			  Finally generates an FRotationMatrix (rotation matrix)*/
+			if (GetWorld()->SweepSingleByObjectType(Hit,TraceStart,TraceEnd,FQuat::Identity,ObjectQueryParams,CollisionShape,CollisionQueryParams))
+			{
+				TraceEnd = Hit.ImpactPoint;
+				ProjRotation = FRotationMatrix::MakeFromX(TraceEnd - MuzzleLocation).Rotator();
+
+				const FOnHitFlashSound* HitFeedback = nullptr;
+				switch (UPhysicalMaterial::DetermineSurfaceType(Hit.PhysMaterial.Get()))
+				{
+				case SurfaceType_Default:
+				case SURFACE_CONCRETE:
+					HitFeedback = &DefaultConcreteOnHit;
+					break;
+				case SURFACE_DIRT:
+					HitFeedback = &DirtOnHit;
+					break;
+				case SURFACE_WOOD:
+					HitFeedback = &WoodOnHit;
+					break;
+				case SURFACE_GLASS:
+					HitFeedback = &GlassOnHit;
+					break;
+				case SURFACE_ENEMY:
+					HitFeedback = &EnemyOnHit;
+					break;
+				default:
+					break;
+				}
+
+				if (HitFeedback)
+				{
+					SpawnImpactDecal(Hit, InstigatorCharacter, HitFeedback->DecalMaterial, HitFeedback->DecalScale);
+
+					if (HitFeedback->OnHitFlash)
+					{
+						UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, HitFeedback->OnHitFlash, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
+					}
+
+					if (HitFeedback->OnHitSound)
+					{
+						UGameplayStatics::PlaySoundAtLocation(this, HitFeedback->OnHitSound, Hit.ImpactPoint,1.6f);
+					}
+				}
+			}
+
 
 			//Begin Spawn  Projectile at the Muzzle
 			FTransform SpawnMT = FTransform(ProjRotation , MuzzleLocation);//combine Location w/ Rotation
@@ -131,12 +181,51 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 		}
 
 		//use recoil
-		InstigatorCharacter->AddControllerPitchInput(VerticalRecoil);
+		InstigatorCharacter->AddControllerPitchInput(-VerticalRecoil);
 		InstigatorCharacter->AddControllerYawInput(FMath::RandRange(-HorizontalRecoil,HorizontalRecoil));
 
 		ConsumeMagAmmo();
 	}
 	
+}
+
+void ASGunBase::SpawnImpactDecal(const FHitResult& Hit, APawn* InstigatorPawn, UMaterialInterface* DecalMaterial, const FVector& DecalScale)
+{
+	if (!DecalActor || !DecalMaterial)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Instigator = InstigatorPawn;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	const FVector SpawnLocation = Hit.ImpactPoint + Hit.ImpactNormal;
+	const FRotator SpawnRotation = (-Hit.ImpactNormal).Rotation();
+	const FTransform SpawnTransform(SpawnRotation, SpawnLocation, DecalScale);
+	AActor* SpawnedDecal = GetWorld()->SpawnActor<AActor>(DecalActor, SpawnTransform, SpawnParams);
+	if (!IsValid(SpawnedDecal))
+	{
+		return;
+	}
+
+	// WeaponFire runs on the server. Replicate the short-lived cosmetic actor to clients as well.
+	SpawnedDecal->SetReplicates(true);
+
+	if (UPrimitiveComponent* HitComponent = Hit.GetComponent())
+	{
+		SpawnedDecal->AttachToComponent(HitComponent, FAttachmentTransformRules::KeepWorldTransform);
+	}
+
+	if (UDecalComponent* DecalComponent = SpawnedDecal->FindComponentByClass<UDecalComponent>())
+	{
+		DecalComponent->SetDecalMaterial(DecalMaterial);
+		DecalComponent->SetWorldLocationAndRotation(SpawnLocation, SpawnRotation);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Impact decal actor %s has no DecalComponent"), *GetNameSafe(SpawnedDecal));
+	}
 }
 
 void ASGunBase::SpawnCasing()

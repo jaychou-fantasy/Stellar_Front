@@ -10,6 +10,7 @@ class ASGunCasing;
 class UAnimMontage;
 class UParticleSystem;
 class USoundBase;
+class UMaterialInterface;
 class USkeletalMeshComponent;
 class UStaticMeshComponent;
 class ASProjectileBase;
@@ -29,6 +30,26 @@ struct FWeaponFireAnimation
 	/** Weapon animation played when this weapon fires. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
 	UAnimMontage* WeaponMontage = nullptr;
+};
+
+USTRUCT(BlueprintType)
+struct FOnHitFlashSound
+{
+	GENERATED_BODY()
+
+	/** Material applied to the shared bullet-hole actor for this physical surface. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Hit Feedback")
+	UMaterialInterface* DecalMaterial = nullptr;
+
+	/** Spawn scale for the shared bullet-hole actor. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Hit Feedback")
+	FVector DecalScale = FVector(0.4f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Hit Feedback")
+	UNiagaraSystem* OnHitFlash = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Hit Feedback")
+	USoundBase* OnHitSound = nullptr;
 };
 
 
@@ -64,6 +85,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	int32 GetMagSize() const { return MagSize; };
 	
+	
 	/** Returns 2*/
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	USkeletalMeshComponent* GetGunMesh() const { return GunMeshComponent; }
@@ -84,6 +106,12 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Icon")
+	UTexture2D* WeaponIcon;
+	
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Icon")
+	FText WeaponName;
+	
 	/** Gun mesh: 1st person view (seen only by self) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
 	USkeletalMeshComponent* GunMeshComponent;
@@ -103,8 +131,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
 	UStaticMeshComponent* Sight;
 	
+	//casing actor
 	UPROPERTY(EditAnywhere, Category = "Fire")
 	TSubclassOf<ASGunCasing> CasingClass;
+
+	/** Shared actor blueprint containing the DecalComponent, normally BP_BulletDecal. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Hit Feedback")
+	TSubclassOf<AActor> DecalActor;
 	
 	//Ammo
 	UPROPERTY(EditDefaultsOnly,Category = "Fire")
@@ -157,8 +190,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Fire")
 	UNiagaraSystem* MuzzleFlash;
 	
-	UPROPERTY(EditDefaultsOnly, Category = "Fire")
-	UNiagaraSystem* OnHitFlash;
+	UPROPERTY(EditDefaultsOnly, Category = "Hit Feedback")
+	FOnHitFlashSound DirtOnHit;
+
+	/** Used for both SurfaceType_Default and the Concrete physical material. */
+	UPROPERTY(EditDefaultsOnly, Category = "Hit Feedback")
+	FOnHitFlashSound DefaultConcreteOnHit;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Hit Feedback")
+	FOnHitFlashSound GlassOnHit;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Hit Feedback")
+	FOnHitFlashSound EnemyOnHit;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Hit Feedback")
+	FOnHitFlashSound WoodOnHit;
+
+	/** Spawns the shared bullet-hole actor, then applies this surface's material to its DecalComponent. */
+	void SpawnImpactDecal(const FHitResult& Hit, APawn* InstigatorPawn, UMaterialInterface* DecalMaterial, const FVector& DecalScale);
 	
 	//fire anim montage
 	UPROPERTY(EditDefaultsOnly, Category = "Animation")

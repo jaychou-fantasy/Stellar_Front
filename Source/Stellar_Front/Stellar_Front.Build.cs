@@ -8,7 +8,7 @@ public class Stellar_Front : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput","GameplayTags" ,"MetasoundEngine","Niagara"});
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput","GameplayTags" ,"MetasoundEngine","Niagara", "PhysicsCore", "UMG"});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 

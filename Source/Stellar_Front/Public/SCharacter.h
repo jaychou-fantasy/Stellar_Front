@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MainWidget.h"
 #include "GameFramework/Character.h"
 #include "SCharacter.generated.h"
 
@@ -117,6 +118,10 @@ protected:
 	/** The weapon spawned and currently equipped by this character. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Weapons")
 	TObjectPtr<ASGunBase> EquippedGun;
+	
+	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite,Category = "UI")
+	UMainWidget* MainUI;
+	
 public:
 	ASCharacter();
 
@@ -129,6 +134,7 @@ public:
 	void BeginPlay() override;
 	
 protected:
+	UFUNCTION(BlueprintCallable)
 	void SpawnWeapon();
 	
 	/** Fires a projectile. */
@@ -158,7 +164,9 @@ protected:
 	bool bWantsToSprint = false;
 
 public:
-
+	/**return UI**/
+	//c++ use it
+	UMainWidget* GetMainUI() { return MainUI;}
 
 	/** Returns Mesh1P subobject **/
 	USkeletalMeshComponent* GetArm() const { return ArmComponent; }

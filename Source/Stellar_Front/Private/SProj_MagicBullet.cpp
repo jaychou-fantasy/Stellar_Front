@@ -8,12 +8,13 @@
 ASProj_MagicBullet::ASProj_MagicBullet()
 {
 	SphereComp->SetSphereRadius(20.0f);
-	SphereComp->OnComponentBeginOverlap.AddDynamic(this,&ASProj_MagicBullet::OnActorOverlap);
+	SphereComp->OnComponentHit.RemoveDynamic(this, &ASProj_MagicBullet::OnActorHit);
+	SphereComp->OnComponentHit.AddDynamic(this, &ASProj_MagicBullet::OnProjectileHit);
 	
 	InitialLifeSpan = 10.0f;
 }
 
-void ASProj_MagicBullet::OnActorOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void ASProj_MagicBullet::OnProjectileHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	// Only add impulse and destroy projectile if we hit a physics object
 	if ((OtherActor) && (OtherActor != this) && (OtherComp) && OtherComp->IsSimulatingPhysics())
@@ -40,6 +41,7 @@ void ASProj_MagicBullet::OnActorOverlap(UPrimitiveComponent* OverlappedComponent
 			MatInst->SetVectorParameterValue("Color", FLinearColor::MakeRandomColor());
 		}
 
-		Explode();
 	}
+
+	ASProjectileBase::OnActorHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
 }

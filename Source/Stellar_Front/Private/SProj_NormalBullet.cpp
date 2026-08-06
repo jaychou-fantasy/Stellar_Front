@@ -10,20 +10,20 @@
 ASProj_NormalBullet::ASProj_NormalBullet()
 {
 	SphereComp->SetSphereRadius(20.0f);
-	SphereComp->OnComponentBeginOverlap.AddDynamic(this, &ASProj_NormalBullet::OnActorOverlap);
+	SphereComp->OnComponentHit.RemoveDynamic(this, &ASProj_NormalBullet::OnActorHit);
+	SphereComp->OnComponentHit.AddDynamic(this, &ASProj_NormalBullet::OnProjectileHit);
 	
 	InitialLifeSpan = 10.0f;
 	DamageAmount = 20.0f;
 }
 
-void ASProj_NormalBullet::OnActorOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+void ASProj_NormalBullet::OnProjectileHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
 	//we set this "Instigator" in "SpawnActor<>()" s
 	if (OtherActor && OtherActor != GetInstigator())
 	{
-		if (USGameplayFunctionLibrary::ApplyDamageAndImpulse(GetInstigator(),OtherActor,DamageAmount,SweepResult))
-		{
-			Explode();
-		}
+		USGameplayFunctionLibrary::ApplyDamageAndImpulse(GetInstigator(), OtherActor, DamageAmount, Hit);
 	}
+
+	ASProjectileBase::OnActorHit(HitComp, OtherActor, OtherComp, NormalImpulse, Hit);
 }

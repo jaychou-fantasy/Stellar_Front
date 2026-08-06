@@ -51,12 +51,6 @@ protected:
 	
 	
 	//impact visual effects,sound,shake
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
-	UParticleSystem* ImpactVFX;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
-	USoundCue* ImpactSound;
-	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Shake")
 	TSubclassOf<UCameraShakeBase> ImpactShake;
 	
