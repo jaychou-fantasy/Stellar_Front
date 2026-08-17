@@ -14,8 +14,13 @@ bool USAction_Fire::CanStart_Implementation(AActor* Instigator)
 	if (Character)
 	{
 		ASGunBase* Gun = Character->GetEquippedGun();
+		if (!Gun)
+		{
+			return false;
+		}
+
 		//check first time 
-		if (Gun && Gun->MagHasAmmo() && Super::CanStart_Implementation(Instigator))
+		if (Gun->MagHasAmmo() && Super::CanStart_Implementation(Instigator))
 		{
 			return true;
 		}
@@ -48,15 +53,11 @@ void USAction_Fire::StartAction_Implementation(AActor* Instigator)
 	//so we just need to limit the timer ------ only run in Server
 	if (Instigator->HasAuthority())
 	{
-		USActionComponent* OwningComp = this->GetOwningComponent();
-		FGameplayTag AimTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Aim"));
-		bool bIsAiming = OwningComp->ActiveGameplaytags.HasTag(AimTag);
-		
 		FTimerDelegate Delegate;
-		Delegate.BindUFunction(this,"FireDelay_Elapsed",Character,bIsAiming);
+		Delegate.BindUFunction(this,"FireDelay_Elapsed",Character);
 		float FireRate = Gun->GetFireRate();
 		
-		FireDelay_Elapsed(Character,bIsAiming);
+		FireDelay_Elapsed(Character);
 		GetWorld()->GetTimerManager().SetTimer(TimerHandle_FireDelay,Delegate,FireRate,true);
 		// Normally, inside a Character subclass, you can directly use GetTimerManager,
 		// but outside of it, you need to use GetWorld
@@ -64,25 +65,25 @@ void USAction_Fire::StartAction_Implementation(AActor* Instigator)
 }
 
 
-void USAction_Fire::FireDelay_Elapsed(APawn* InstigatorPawn, bool bIsAiming)
+void USAction_Fire::FireDelay_Elapsed(APawn* InstigatorPawn)
 {
 	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
+	ASGunBase* Gun = IsValid(InstigatorCharacter) ? InstigatorCharacter->GetEquippedGun() : nullptr;
+
 	//check second time here. To prevent firing without Any Ammo during Shooting process
-	if (!IsValid(InstigatorCharacter) || !InstigatorCharacter->GetEquippedGun()->MagHasAmmo())
+	if (!IsValid(Gun) || !Gun->MagHasAmmo())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_FireDelay);
 		StopAction(InstigatorPawn);
 		return;
 	}
 
-	ASGunBase* Gun = InstigatorCharacter->GetEquippedGun();
-	if (!IsValid(Gun) || !Gun->MagHasAmmo())
-	{
-		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_FireDelay);
-		return;
-	}
+	//check Aim at the FireDelay_Elapsed
+	USActionComponent* OwningComp = this->GetOwningComponent();
+	FGameplayTag AimTag = FGameplayTag::RequestGameplayTag(TEXT("Status.Aim"));
+	bool bIsNowAiming = OwningComp->ActiveGameplaytags.HasTag(AimTag);
 
-	Gun->WeaponFire(InstigatorPawn,bIsAiming);
+	Gun->WeaponFire(InstigatorPawn,bIsNowAiming);
 }
 
 

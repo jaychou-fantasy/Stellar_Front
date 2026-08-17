@@ -22,6 +22,7 @@ ASGunBase::ASGunBase()
 	
 	// Create a gun mesh component
 	GunMeshComponent = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FP_Gun"));
+	RootComponent = GunMeshComponent;
 	GunMeshComponent->CastShadow = false;
 	//GunMeshComponent->SetupAttachment(ArmComponent, TEXT("GripPoint"));
 	
@@ -49,6 +50,47 @@ ASGunBase::ASGunBase()
 void ASGunBase::PlayKakeSound()
 {
 	UGameplayStatics::PlaySoundAtLocation(this,KaKeSound,GetOwner()->GetActorLocation());
+}
+
+void ASGunBase::PlayOnHitFeedback(const FHitResult& Hit)
+{
+	const FOnHitFlashSound* HitFeedback = nullptr;
+	switch (UPhysicalMaterial::DetermineSurfaceType(Hit.PhysMaterial.Get()))
+	{
+	case SurfaceType_Default:
+	case SURFACE_CONCRETE:
+		HitFeedback = &DefaultConcreteOnHit;
+		break;
+	case SURFACE_DIRT:
+		HitFeedback = &DirtOnHit;
+		break;
+	case SURFACE_WOOD:
+		HitFeedback = &WoodOnHit;
+		break;
+	case SURFACE_GLASS:
+		HitFeedback = &GlassOnHit;
+		break;
+	case SURFACE_ENEMY:
+		HitFeedback = &EnemyOnHit;
+		break;
+	default:
+		break;
+	}
+
+	if (HitFeedback)
+	{
+		SpawnImpactDecal(Hit.ImpactPoint, (-Hit.ImpactNormal).Rotation(), HitFeedback->DecalMaterial, HitFeedback->DecalScale);
+
+		if (HitFeedback->OnHitFlash)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, HitFeedback->OnHitFlash, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
+		}
+
+		if (HitFeedback->OnHitSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, HitFeedback->OnHitSound, Hit.ImpactPoint,1.6f);
+		}
+	}
 }
 
 void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
@@ -111,7 +153,6 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 			FCollisionQueryParams CollisionQueryParams;
 			CollisionQueryParams.AddIgnoredActor(InstigatorCharacter);
 			CollisionQueryParams.AddIgnoredActor(this);
-			CollisionQueryParams.bReturnPhysicalMaterial = true;
 
 			FRotator ProjRotation;
 			// Fall back since we failed to find any blocking hit
@@ -130,45 +171,6 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 					*Hit.ImpactPoint.ToCompactString(),
 					*TraceEnd.ToCompactString(),
 					*ProjRotation.ToCompactString());
-
-				const FOnHitFlashSound* HitFeedback = nullptr;
-				switch (UPhysicalMaterial::DetermineSurfaceType(Hit.PhysMaterial.Get()))
-				{
-				case SurfaceType_Default:
-				case SURFACE_CONCRETE:
-					HitFeedback = &DefaultConcreteOnHit;
-					break;
-				case SURFACE_DIRT:
-					HitFeedback = &DirtOnHit;
-					break;
-				case SURFACE_WOOD:
-					HitFeedback = &WoodOnHit;
-					break;
-				case SURFACE_GLASS:
-					HitFeedback = &GlassOnHit;
-					break;
-				case SURFACE_ENEMY:
-					HitFeedback = &EnemyOnHit;
-					break;
-				default:
-					break;
-				}
-
-				if (HitFeedback)
-				{
-					//Spawn decal
-					SpawnImpactDecal(TraceEnd, ProjRotation, HitFeedback->DecalMaterial, HitFeedback->DecalScale);
-
-					if (HitFeedback->OnHitFlash)
-					{
-						UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, HitFeedback->OnHitFlash, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
-					}
-
-					if (HitFeedback->OnHitSound)
-					{
-						UGameplayStatics::PlaySoundAtLocation(this, HitFeedback->OnHitSound, Hit.ImpactPoint,1.6f);
-					}
-				}
 			}
 
 
@@ -179,7 +181,11 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 			ActorSpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;// can be nullptr if colliding with wall or sth.
 			ActorSpawnParams.Instigator = InstigatorCharacter;
 
-			GetWorld()->SpawnActor<ASProjectileBase>(ProjectileClass, SpawnMT, ActorSpawnParams);
+			ASProjectileBase* SpawnedProjectile = GetWorld()->SpawnActor<ASProjectileBase>(ProjectileClass, SpawnMT, ActorSpawnParams);
+			if (SpawnedProjectile)
+			{
+				SpawnedProjectile->SetSourceGun(this);
+			}
 		}
 
 		//use recoil

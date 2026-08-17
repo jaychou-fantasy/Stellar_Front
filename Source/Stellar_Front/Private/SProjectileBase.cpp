@@ -1,6 +1,7 @@
 // Copyright 1998-2017 Epic Games, Inc. All Rights Reserved.
 
 #include "SProjectileBase.h"
+#include "SGunBase.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundCue.h"
 #include "Particles/ParticleSystemComponent.h"
@@ -15,6 +16,7 @@ ASProjectileBase::ASProjectileBase()
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
 	SphereComp->SetCollisionProfileName("Projectile");
 	SphereComp->SetSphereRadius(SphereRadius);
+	SphereComp->bReturnMaterialOnMove = true;
 	/*************///Assign on "OnComponentHit"
 	SphereComp->OnComponentHit.AddDynamic(this, &ASProjectileBase::OnActorHit);	// set up a notification for when this component hits something blocking
 	RootComponent = SphereComp;
@@ -51,6 +53,11 @@ ASProjectileBase::ASProjectileBase()
 
 void ASProjectileBase::OnActorHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
+	if (SourceGun)
+	{
+		SourceGun->PlayOnHitFeedback(Hit);
+	}
+
 	Explode();
 }
 

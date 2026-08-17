@@ -198,7 +198,10 @@ void ASCharacter::StopSprint()
 
 void ASCharacter::Reload()
 {
-	ActionComp->StartActionByName(this,"Reload");
+	if (ActionComp->StartActionByName(this,"Reload"))
+	{
+		ActionComp->StopActionByName(this,"Fire");
+	}
 }
 
 

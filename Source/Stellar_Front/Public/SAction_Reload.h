@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "SAction.h"
 #include "SAction_Reload.generated.h"
+class UAnimMontage;
 
 /**
  * 
@@ -20,5 +21,5 @@ public:
 	virtual void StopAction_Implementation(AActor* Instigator) override;
 
 protected:
-	
+	 void OnReloadAnimEnded(UAnimMontage* ReloadMontage, bool bIsInterrupted);	
 };

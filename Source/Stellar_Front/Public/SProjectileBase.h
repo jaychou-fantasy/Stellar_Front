@@ -15,6 +15,7 @@ class UParticleSystemComponent;
 class UAudioComponent;
 class USoundCue;
 class UCameraShakeBase;
+class ASGunBase;
 
 
 UCLASS(ABSTRACT)
@@ -48,6 +49,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category = "Components")
 	UAudioComponent* AudioComp;
+
+	UPROPERTY()
+	TObjectPtr<ASGunBase> SourceGun;
 	
 	
 	//impact visual effects,sound,shake
@@ -79,4 +83,6 @@ public:
 	UProjectileMovementComponent* GetProjectileMovement() const { return ProjectileMovementComp; }
 	
 	float GetSphereRadius() const { return SphereRadius; }
+
+	void SetSourceGun(ASGunBase* NewSourceGun) { SourceGun = NewSourceGun; }
 };

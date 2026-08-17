@@ -62,6 +62,7 @@ public:
 	ASGunBase();
 	
 	void PlayKakeSound();
+	void PlayOnHitFeedback(const FHitResult& Hit);
 	
 	UFUNCTION(BlueprintCallable)
 	void WeaponFire(APawn* InstigatorPawn, bool bIsAiming);
@@ -102,6 +103,8 @@ public:
 	
 	UMetaSoundSource* GetFireSound() const { return FireSound; }
 	UNiagaraSystem* GetMuzzleFlash() const { return MuzzleFlash; }
+
+	UAnimMontage* GetWeaponReloadAnim() const { return WeaponReloadAnim; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -206,7 +209,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Hit Feedback")
 	FOnHitFlashSound WoodOnHit;
 
-	/** Spawns the shared bullet-hole actor at the trace end, then applies this surface's material. */
+	/** Spawns the shared bullet-hole actor at the projectile hit point, then applies this surface's material. */
 	void SpawnImpactDecal(const FVector& SpawnLocation, const FRotator& SpawnRotation, UMaterialInterface* DecalMaterial, const FVector& DecalScale);
 	
 	//fire anim montage

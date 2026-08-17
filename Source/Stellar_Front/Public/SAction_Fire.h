@@ -24,5 +24,5 @@ public:
 protected:
 	FTimerHandle TimerHandle_FireDelay;
 	UFUNCTION()
-	void FireDelay_Elapsed(APawn* InstigatorPawn, bool bIsAiming);
+	void FireDelay_Elapsed(APawn* InstigatorPawn);
 };
