@@ -60,9 +60,11 @@ protected:
     bool bKeyFound = false;                                                                     
 	
     UPROPERTY(Replicated, BlueprintReadOnly)
-    APlayerState* KeyHolder = nullptr;                                                                    
+    APlayerState* KeyHolder = nullptr;    
+	
     UPROPERTY(Replicated, BlueprintReadOnly)                                           
-    FVector UploadZoneLocation = FVector::ZeroVector;                                                                                                                                                      
+    FVector UploadZoneLocation = FVector::ZeroVector;   
+	
     UPROPERTY(Replicated, BlueprintReadOnly)
     float UploadProgress = 0.0f; 
 	
@@ -74,7 +76,8 @@ protected:
     FVector EvacShipLocation = FVector::ZeroVector;
 	
     UPROPERTY(Replicated, BlueprintReadOnly)                                                             
-    float EvacTimeRemaining = 0.0f;                                                                                      
+    float EvacTimeRemaining = 0.0f;     
+	
     // ===== score =====                                             
     UPROPERTY(Replicated, BlueprintReadOnly)                                                            
     int32 RedScore = 0;                                                                                                 

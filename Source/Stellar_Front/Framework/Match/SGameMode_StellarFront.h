@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
 #include "Framework/Match/SGameState.h"
+#include "Framework/Player/SPlayerState.h"
 #include "SGameMode_StellarFront.generated.h"
 
 
@@ -21,6 +22,8 @@ public:
 	ASGameMode_StellarFront();
 	
 	virtual void PostLogin(APlayerController* NewPlayer) override;
+	
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	
 	virtual bool ReadyToStartMatch_Implementation() override;
 	
@@ -47,12 +50,10 @@ protected:
 	// UPROPERTY()
 	// bool bReady = false;
 	
-		
 	
-	int32 RedCnt = 0;
-	int32 BlueCnt = 0;
+	void AssignTeam(ASPlayerState* PlayerState);
 	
-	void AssignTeam(APlayerState* PlayerState);
+	int32 CountPlayersInTeam(ETeam TargetTeam,const APlayerState* PlayerToIgnore = nullptr) const;
 	
 	void SetPhase(EGamePhase NewPhase);
 	

@@ -6,6 +6,12 @@
 
 bool USGameplayFunctionLibrary::ApplyDamage(AActor* DamageCauser, AActor* TargetActor, float DamageAmount)
 {
+	//check whether it's the server that has the authority of TargetActor
+	if (!IsValid(TargetActor) || !TargetActor->HasAuthority())
+	{
+		return false;
+	}
+	
 	USAttributeComponent* AttributeComp = USAttributeComponent::GetAttributeComp(TargetActor);
 	if (AttributeComp)
 	{

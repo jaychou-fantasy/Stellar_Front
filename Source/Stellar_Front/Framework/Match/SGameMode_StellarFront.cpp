@@ -2,9 +2,11 @@
 
 
 #include "Framework/Match/SGameMode_StellarFront.h"
-#include "Character/SCharacter.h"
+#include "EngineUtils.h"
 #include "Framework/Match/SGameState.h"
 #include "Framework/Player/SPlayerState.h"
+#include "GameFramework/PlayerStart.h"
+
 
 ASGameMode_StellarFront::ASGameMode_StellarFront()
 {
@@ -14,6 +16,10 @@ ASGameMode_StellarFront::ASGameMode_StellarFront()
 
 	// use our custom HUD class
 	//HUDClass = ASHUD::StaticClass();
+	
+	
+	//true when the game need not start imediately
+	bDelayedStart = true;
 }
 
 
@@ -21,6 +27,11 @@ ASGameMode_StellarFront::ASGameMode_StellarFront()
 void ASGameMode_StellarFront::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
+	
+	if (!NewPlayer)
+	{
+		return;
+	}
 	
 	ASPlayerState* PS = NewPlayer->GetPlayerState<ASPlayerState>();
 	if (PS)
@@ -31,29 +42,98 @@ void ASGameMode_StellarFront::PostLogin(APlayerController* NewPlayer)
 	//@fixme:check if match the condition to start game
 }
 
-
-//@fixme:: we can parse RedCnt&BlueCnt as a global Variable,and we don't need to calculate when every player login in (or maybe 20 is rather small,don't bother to change)
-void ASGameMode_StellarFront::AssignTeam(APlayerState* PlayerState)
+AActor* ASGameMode_StellarFront::ChoosePlayerStart_Implementation(AController* Player)
 {
-	for (APlayerState* State : GameState->PlayerArray)
+	const ASPlayerState* PlayerState = Player ? Player->GetPlayerState<ASPlayerState>() : nullptr;
+	if (!PlayerState)
 	{
-		ASPlayerState* SPS = Cast<ASPlayerState>(State);
-		if (!SPS)
+		//find a proper and random player_start to spawn character
+		return Super::ChoosePlayerStart_Implementation(Player);
+	}
+	
+	FName RequiredTag;
+	
+	switch (PlayerState->GetTeam())
+	{
+	case ETeam::Red:
+		RequiredTag = TEXT("Red");
+		break;
+	case ETeam::Blue:
+		RequiredTag = TEXT("Blue");
+		break;
+	default:
+		return Super::ChoosePlayerStart_Implementation(Player);
+	}
+	
+	TArray<APlayerStart*> TeamStarts;
+	
+	for (TActorIterator<APlayerStart> It(GetWorld()) ; It ; ++It)
+	{
+		if (It->PlayerStartTag == RequiredTag)
+		{
+			TeamStarts.Add(*It);
+		}
+		if (TeamStarts.IsEmpty())
+		{
+			UE_LOG(LogGameMode,Warning,TEXT("No PlayerStart for Team Tag : %s"), *RequiredTag.ToString());
+			return Super::ChoosePlayerStart_Implementation(Player);
+		}
+	}
+	//return when it's not empty
+	return TeamStarts[FMath::RandRange(0,TeamStarts.Num()-1)];
+}
+
+int32 ASGameMode_StellarFront::CountPlayersInTeam(ETeam TargetTeam, const APlayerState* PlayerToIgnore) const
+{
+	const ASGameState* StellarGameState = GetGameState<ASGameState>();
+	if (!StellarGameState)
+	{
+		return 0;
+	}
+	
+	int32 Cnt = 0;
+	for (APlayerState* PS :StellarGameState->PlayerArray)
+	{
+		//don't count himself (as he has not in team yet)
+		if (PS == PlayerToIgnore)
 		{
 			continue;
 		}
-		if (SPS->GetTeam() == ETeam::Red)
+		
+		const ASPlayerState* SPlayerState = Cast<ASPlayerState>(PS);
+		if (SPlayerState && SPlayerState->GetTeam() == TargetTeam)
 		{
-			RedCnt++;
-		}
-		else
-		{
-			BlueCnt++;
+			Cnt++;
 		}
 	}
 	
-	ASPlayerState* MyPS = Cast<ASPlayerState>(PlayerState);
-	MyPS->SetTeam((RedCnt <= BlueCnt) ? ETeam::Red : ETeam::Blue);
+	return Cnt;
+}
+
+
+//@fixme:: we can parse RedCnt&BlueCnt as a global Variable,and we don't need to calculate when every player login in (or maybe 20 is rather small,don't bother to change)
+void ASGameMode_StellarFront::AssignTeam(ASPlayerState* PlayerState)
+{
+	if (!PlayerState)
+	{
+		return;
+	}
+	
+	const int32 RedCnt = CountPlayersInTeam(ETeam::Red , PlayerState);
+	const int32 BlueCnt = CountPlayersInTeam(ETeam::Blue , PlayerState);
+	
+	const ETeam AssignedTeam = (RedCnt <= BlueCnt) ? ETeam::Red : ETeam::Blue;
+	PlayerState->SetTeam(AssignedTeam);
+}
+
+
+bool ASGameMode_StellarFront::ReadyToStartMatch_Implementation()
+{
+	if (GetMatchState() != MatchState::WaitingToStart)
+	{
+		return false;
+	}
+	return CountPlayersInTeam(ETeam::Red) >= 1 && CountPlayersInTeam(ETeam::Blue ) >= 1;
 }
 
 void ASGameMode_StellarFront::SetPhase(EGamePhase NewPhase)
@@ -72,26 +152,6 @@ void ASGameMode_StellarFront::SetPhase(EGamePhase NewPhase)
 	
 }
 
-bool ASGameMode_StellarFront::ReadyToStartMatch_Implementation()
-{
-	if (RedCnt == MaxPlayerPerTeam && BlueCnt == MaxPlayerPerTeam)
-	{
-		return true;
-	}
-	if (RedCnt >=1 &&BlueCnt >=1)
-	{
-		for (APlayerState* State :GameState->PlayerArray)
-		{
-			ASPlayerState* PlayerState = Cast<ASPlayerState>(State);
-			// @fixme: continue if "Spectator"
-			if (!PlayerState || !PlayerState->GetReady())
-			{
-				return false;
-			}
-		}
-	}
-	return Super::ReadyToStartMatch_Implementation();
-}
 
 void ASGameMode_StellarFront::HandleMatchHasStarted()
 {
@@ -139,5 +199,4 @@ void ASGameMode_StellarFront::EndMatch()
 {
 	Super::EndMatch();
 }
-
 

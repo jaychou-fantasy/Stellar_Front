@@ -12,6 +12,9 @@
 
 ASProjectileBase::ASProjectileBase()
 {
+	bReplicates = true;
+	SetReplicateMovement(true);
+	
 	// Use a sphere as a simple collision representation
 	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
 	SphereComp->SetCollisionProfileName("Projectile");
@@ -53,6 +56,11 @@ ASProjectileBase::ASProjectileBase()
 
 void ASProjectileBase::OnActorHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+		
 	if (SourceGun)
 	{
 		SourceGun->PlayOnHitFeedback(Hit);
