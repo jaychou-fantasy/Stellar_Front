@@ -55,7 +55,10 @@ public:
 	//void AddAssists() { if (HasAuthority()) Assists++; } 
 
 
-	
+	//Getter
+	bool IsAlive() const { return bIsAlive; }
+	int32 GetKills() const { return Kills; }
+	int32 GetDeaths() const { return Deaths; } 
 
 protected:
 	UPROPERTY(Replicated,BlueprintReadOnly)

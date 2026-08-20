@@ -130,6 +130,16 @@ void ASCharacter::OnJumped_Implementation()
 	}
 }
 
+void ASCharacter::Destroyed()
+{
+	if (IsValid(EquippedGun))
+	{
+		EquippedGun->Destroy();//destroy the gun actor itself
+		EquippedGun = nullptr;//clean the reference in ASCharacter
+	}
+	Super::Destroyed();
+}
+
 void ASCharacter::SpawnWeapon()
 {
 	if (IsValid(EquippedGun))

@@ -3,7 +3,7 @@
 #include "Gameplay/Attributes/SAttributeComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
-#include "Framework/Match/SGameMode.h"
+#include "Framework/Match/SGameMode_StellarFront.h"
 
 static TAutoConsoleVariable<float> CVarDamageMultiplier(TEXT("su.DamageMultiplier"),1.0f,TEXT("Gloabal Damage Modifier for Attribute Component"),ECVF_Cheat);
 
@@ -59,11 +59,11 @@ float USAttributeComponent::GetHealth() const
 bool USAttributeComponent::Kill(AActor* Instigator)
 {
 	//HealthMax is a protected property.While GetHealthMax() is a public function
-	return ApplyHealthchange(Instigator,-GetHealthMax());
+	return ApplyHealthChange(Instigator,-GetHealthMax());
 }
 
 
-bool USAttributeComponent::ApplyHealthchange(AActor* InstigatorActor, float Delta)
+bool USAttributeComponent::ApplyHealthChange(AActor* InstigatorActor, float Delta)
 {
 	//God Mode
 	if (!GetOwner()->CanBeDamaged() && Delta < 0.0f)
@@ -80,6 +80,7 @@ bool USAttributeComponent::ApplyHealthchange(AActor* InstigatorActor, float Delt
 	//true logic
 	float OldHealth = Health;
 	float NewHealth = FMath::Clamp(Health+Delta,0.0f,HealthMax);
+	//if he dies, the actual delta would be 0,and this FUNCTION won't execute
 	float ActualDelta = NewHealth - OldHealth;
 	//Only Server can make Health Change
 	if (GetOwner()->HasAuthority())
@@ -91,17 +92,22 @@ bool USAttributeComponent::ApplyHealthchange(AActor* InstigatorActor, float Delt
 			MulticastHealthChanged(InstigatorActor,Health,ActualDelta);
 			UE_LOG(LogTemp, Log, TEXT("ApplyHealthChange: Owner=%s NewHealth=%f Delta=%f"), *GetNameSafe(GetOwner()), Health, ActualDelta);
 		}
-	}
-	
-	//Died
-	if (ActualDelta < 0 && Health <= 0.0f)
-	{
-		ASGameMode *GameMode = GetWorld()->GetAuthGameMode<ASGameMode>();
-		if (GameMode)
+		
+		//Died
+		const bool bJustDied = OldHealth > 0.0f && ActualDelta < 0 && Health <= 0.0f;
+		//check OldHealth > 0.0f to prevent the DIED Actor still recieve Death Notification
+		if (bJustDied)
 		{
-			//@fixme::Add "On Actor Killed" when we accomplish it in GameModebase
+			ASGameMode_StellarFront* GameMode = GetWorld()->GetAuthGameMode<ASGameMode_StellarFront>();
+			APawn* VictimPawn = Cast<APawn>(GetOwner());
+			if (GameMode && VictimPawn)
+			{
+				GameMode->HandlePlayerDeath(InstigatorActor,VictimPawn);
+			}
 		}
 	}
+	
+	
 	
 	return ActualDelta != 0;
 	//return true if there was an actuall HealthChange, false vice versa.

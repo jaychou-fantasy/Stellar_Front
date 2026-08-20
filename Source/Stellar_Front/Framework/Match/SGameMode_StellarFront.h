@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
 #include "Framework/Match/SGameState.h"
+#include "Framework/Player/SPlayerController.h"
 #include "Framework/Player/SPlayerState.h"
 #include "SGameMode_StellarFront.generated.h"
 
@@ -40,16 +41,26 @@ public:
 	
 	void StartDeployment();
 	void EndDeployment();
+
+public:
+	void HandlePlayerDeath(AActor* Instigator,APawn* VictimPawn);
+	
 	
 	//@fixme: set to protected if done
 	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite, Category = "GameMode")
 	int32 MaxPlayerPerTeam = 20;
 protected:
+	//you can find corresponding TimerHandle when called "CancelRespawn" in "Log out || Handle Match Ended"
+	TMap<TWeakObjectPtr<ASPlayerController>,FTimerHandle> PendingRespawnTimers;
 	
+	void CancelRespawn(ASPlayerController* PlayerController);
 	
 	// UPROPERTY()
 	// bool bReady = false;
+	void RespawnPlayer(TWeakObjectPtr<ASPlayerController> PlayerController);
 	
+	UPROPERTY(EditDefaultsOnly,Category = "GameMode")
+	float RespawnDelay = 2.0f;
 	
 	void AssignTeam(ASPlayerState* PlayerState);
 	

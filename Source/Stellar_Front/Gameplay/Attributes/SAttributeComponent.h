@@ -33,13 +33,14 @@ protected:
 	//multicast FOnHealthChanged
 	UFUNCTION(NetMulticast,Reliable)//@fixme:note as unreliable as you move the "state" out of SCharacter
 	void MulticastHealthChanged(AActor* Instigator,float NewHealth,float Delta);
-	
+
 public:
+	
 	UPROPERTY(BlueprintAssignable,Category = "Attributes")
 	FOnHealthChanged OnHealthChanged;
 	
 	UFUNCTION(BlueprintCallable,Category = "Attributes")
-	bool ApplyHealthchange(AActor* InstigatorActor,float Delta);
+	bool ApplyHealthChange(AActor* InstigatorActor,float Delta);
 	
 	UFUNCTION(BlueprintCallable,Category = "Attributes")
 	bool IsAlive() const;

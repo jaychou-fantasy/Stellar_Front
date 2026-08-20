@@ -99,6 +99,69 @@ return TeamStarts[FMath::RandRange(0, TeamStarts.Num() - 1)];
 
 ---
 
+## Day 1 → Day 2 交接（开始 Day 2 前必读）
+
+### 当前工作区状态
+
+Day 1 的相关代码与地图已提交为当前基线（提交 `b9f97fb`，`finish with AssignTeam logic & Projectile Replicate Movement`）。开始 Day 2 前不要重置或覆盖这些文件；当前工作区只保留本计划的交接更新。
+
+| 项目 | 当前状态 | 交接说明 |
+|---|---|---|
+| `Content/Maps/FirstPersonExampleMap.umap` | Day 1 基线 | 已放置/标记 Red 与 Blue PlayerStart。 |
+| `Framework/Match/SGameMode_StellarFront.*` | Day 1 基线 | 已接入延迟开局、实时分队、Team PlayerStart 选择。`AssignTeam` 现已使用 `ASPlayerState*`。 |
+| `Combat/Projectiles/SProjectileBase.cpp` | Day 1 基线 | 已启用 Actor 与移动复制；命中销毁只在服务器执行。 |
+| `Gameplay/FunctionLibrary/SGameplayFunctionLibrary.cpp` | Day 1 基线 | 已阻止客户端执行伤害与物理冲量。 |
+| `Framework/Match/SGameState.h` | Day 1 基线 | 只有格式/空白改动；不属于 Day 1 逻辑，先不要与 Day 2 混在一起处理。 |
+| `Stellar_Front_7Day_Implementation_Plan.md` | 当前工作区修改 | 本计划与本交接内容。 |
+
+### Day 1 尚未关闭的阻断项
+
+`ChoosePlayerStart_Implementation()` 仍把“没有找到 TeamStart 的回退判断”放在遍历 `PlayerStart` 的循环里。只要第一个枚举到的 PlayerStart 不匹配当前队伍，就会过早回退 UE 默认选点。
+
+在开始 Day 2 之前，把它固定为以下结构：先遍历完所有 PlayerStart，再判断 `TeamStarts` 是否为空。
+
+```cpp
+for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+{
+    if (It->PlayerStartTag == RequiredTag)
+    {
+        TeamStarts.Add(*It);
+    }
+}
+
+if (TeamStarts.IsEmpty())
+{
+    UE_LOG(LogGameMode, Warning, TEXT("No PlayerStart for team tag: %s"), *RequiredTag.ToString());
+    return Super::ChoosePlayerStart_Implementation(Player);
+}
+
+return TeamStarts[FMath::RandRange(0, TeamStarts.Num() - 1)];
+```
+
+这不是格式问题：未修复时，Red/Blue 出生正确只能是 UE 默认选点碰巧符合，不能作为 Day 1 或 Day 2 的测试基础。
+
+### Day 2 开始前的 10 分钟预检
+
+1. 修复上面的 PlayerStart 循环位置，并编译。
+2. 以 Listen Server、2 Players 运行 PIE：确认第一人 Red、第二人 Blue，且分别从对应 Tag 出生。
+3. 两端各开一枪：确认弹丸可见；在服务端日志确认一次命中只记录一次 Health 变化。
+4. 以上任一项失败时，先回到 Day 1 修复；不要在错误出生或错误伤害链路上继续加入死亡/重生代码。
+
+### Day 2 可直接复用的现有状态
+
+- `ASPlayerState` 已有复制的 `bIsAlive`、`Kills`、`Deaths`，以及服务器限定的 `SetIsAlive`、`AddKills`、`AddDeaths`。
+- `USAttributeComponent` 已在服务器写入 Health，并已有 HealthChanged multicast；当前生命归零处只有占位注释。
+- `SGameMode_BP` 是空的 `ASGameMode_StellarFront` 子类，因此死亡、重生和统计应全部写在 C++ GameMode，不写蓝图。
+- `SAction_Fire` 已限制服务器生成弹丸；Day 2 不要重新设计开火 RPC。
+
+### Day 2 的第一个实现入口
+
+从 `Gameplay/Attributes/SAttributeComponent.cpp` 的生命归零分支开始：它目前查找的是旧 `ASGameMode`，而本周实际运行的是 `ASGameMode_StellarFront`。Day 2 应改为只在服务器把“伤害来源、死亡 Pawn/Controller”交给 `ASGameMode_StellarFront` 的明确死亡处理函数；由 GameMode 负责 PlayerState 统计、延迟与 `RestartPlayer`。
+
+不要在 AttributeComponent 中直接调用 `RestartPlayer`，也不要在客户端的 Health 回调中增加死亡逻辑。
+
+---
+
 # Day 2：死亡、击杀统计与重生
 
 ## 目标
@@ -128,6 +191,97 @@ return TeamStarts[FMath::RandRange(0, TeamStarts.Num() - 1)];
 - Red 击杀 Blue 后，服务器上的 Red Kills +1、Blue Deaths +1。
 - 蓝方 Pawn 消失/失能后在延迟结束时出生于 Blue Start。
 - 双端 PlayerState 的 Alive/Kills/Deaths 一致。
+
+## Day 2 → Day 3 交接（开始 Day 3 前必读）
+
+### 结论
+
+Day 2 的死亡、击杀统计、Pawn 销毁、延迟重生、重生取消和 2～4 人本队出生点链路已经完成，并经过用户的 Listen Server PIE 验证，可以作为 Day 3 控制节点工作的运行基础。
+
+本交接所依据的证据分为两类：
+
+- 源码/配置确认：服务器伤害入口、首次死亡判断、PlayerState 复制、GameMode 重生 Timer、Logout/MatchEnd 清理、本队出生点占用检查均已存在。
+- 用户 PIE 确认：玩家击杀后 Kills/Deaths/Alive 正确，死亡 Pawn 消失并延迟重生，重生取消有效，3～4 人可以从不重叠的本队出生点活动和射击。
+
+本次交接审计没有重新编译，也没有修改 C++、配置或资产。因此不能把静态检查当成一次新的 Build/PIE 证据；运行结论来自本轮用户实际测试。
+
+### 当前基线与工作区
+
+- 当前 HEAD 仍为 `b9f97fb`（`finish with AssignTeam logic & Projectile Replicate Movement`）。
+- Day 2 改动尚未形成新提交，当前工作区为 dirty 状态。
+- `Config/DefaultEngine.ini` 当前将默认 GameMode 指向 `/Game/Blueprints/SGameMode_BP.SGameMode_BP_C`。
+- `SGameMode_BP` 使用 `ASGameMode_StellarFront`，并配置当前 `BP_Player`、`SGameState`、`SPlayerState` 和 `SPlayerController_BP` 类链。
+- `FirstPersonExampleMap` 当前有 4 个 PlayerStart：2 个 `Red`、2 个 `Blue`。
+- `git diff --check` 当前仍报告多处 trailing whitespace；这不影响已完成的 PIE 功能验证，但必须在建立 Day 2 提交基线前清理。
+- 工作区还包含 `Content/Environment/M_Cube_Inst.uasset` 和 `问题StellarFront.docx` 等非 Day 2 主链改动；提交 Day 2 时必须单独确认归属，不要无条件混入死亡/重生提交。
+
+### 已完成的权威调用链
+
+```text
+服务器弹丸命中
+    -> USGameplayFunctionLibrary::ApplyDamage（确认 TargetActor Authority）
+    -> USAttributeComponent::ApplyHealthChange
+    -> Health 首次从 > 0 降到 0（bJustDied）
+    -> ASGameMode_StellarFront::HandlePlayerDeath
+    -> Victim PlayerState：Alive=false、Deaths+1
+    -> 非自杀的有效 Killer PlayerState：Kills+1
+    -> Detach/Destroy 旧 Pawn（ASCharacter::Destroyed 同时销毁武器）
+    -> 服务器 Respawn Timer
+    -> RespawnPlayer：Alive=true、RestartPlayer
+    -> ChoosePlayerStart：优先选择本队未占用出生点
+    -> Controller 控制新的 Pawn
+```
+
+职责边界已经固定：
+
+- `USAttributeComponent` 只负责生命值与“首次死亡”通知，不直接重生。
+- `ASGameMode_StellarFront` 负责死亡规则、统计、Timer、取消和 `RestartPlayer`。
+- `ASPlayerState` 保存并复制跨 Pawn 生命周期的 Team、Alive、Kills、Deaths。
+- 死亡 Pawn 会被销毁；Controller 与 PlayerState 保留；重生后得到的是新的 Pawn 实例。
+
+### Day 2 验收结果
+
+| 验收项 | 状态 | 依据 |
+|---|---|---|
+| Red 击杀 Blue 后 Red Kills +1、Blue Deaths +1 | 通过 | 用户日志与源码 |
+| 生命值到 0 只通知一次死亡 | 通过 | `OldHealth > 0`、`ActualDelta < 0`、`Health <= 0` |
+| 死亡时 Alive=false，重生前恢复为 true | 通过 | PlayerState 服务器写入与用户 PIE |
+| 旧 Pawn 和装备武器被销毁 | 通过 | GameMode 与 `ASCharacter::Destroyed()` |
+| 固定短延迟后由服务器 `RestartPlayer` | 通过 | Timer 源码与用户 PIE |
+| Logout 取消该 Controller 的待执行重生 | 通过 | `CancelRespawn()` 与用户 PIE |
+| Match End 清理全部待执行重生 Timer | 源码通过 | `HandleMatchHasEnded()`；未提供独立的新 PIE 日志 |
+| Team/Alive/Kills/Deaths 在 PlayerState 复制 | 通过 | `DOREPLIFETIME` 与用户双端验证 |
+| 3～4 人使用本队未占用出生点 | 通过 | 2 Red + 2 Blue PlayerStart、占用检查与用户 PIE |
+
+### Day 3 可以依赖的契约
+
+1. `ASPlayerState::GetTeam()` 是控制节点判断 Red/Blue 的权威队伍来源。
+2. `ASPlayerState::IsAlive()` 是控制节点判断玩家能否参与占点的权威存活来源。
+3. Team 和 Alive 只由服务器写入，并通过 PlayerState 复制给客户端。
+4. 玩家死亡后旧 Pawn 会被销毁；重生后的 Pawn 与死亡前不是同一个对象。
+5. 死亡到重生之间，Controller 和 PlayerState 仍存在，但 Controller 暂时没有 Pawn。
+6. Day 3 的区域重叠集合不能长期盲信缓存引用；每次计算前必须过滤无效/已销毁 Pawn、无 `ASPlayerState` 的 Pawn、`IsAlive()==false` 的玩家，以及实际已离开区域的 Pawn。
+7. Day 3 不要重新设计开火、伤害或重生 RPC，也不要新增通用 Objective 框架。
+
+### Day 3 不能假设的内容
+
+- 不能假设死亡前保存的 Pawn 引用在重生后仍有效。
+- 不能假设 `PendingRespawnTimers` 在一次成功重生后已经为空。
+- 不能假设 Alive/Kills/Deaths 已有客户端 `OnRep` 表现函数；目前只有属性复制。
+- 不能假设 `ASGameMode_StellarFront::SetPhase()` 已经限制合法单向推进；这是 Day 3 要补齐的阶段规则。
+- 不能假设 `ASGameState::OnRep_Phase()` 已经提供表现；当前函数为空。
+- 控制节点只应在确认当前阶段为 `OrbitalCombat` 时累计进度；测试前先确认比赛已离开 `WaitingToStart/PreDeploy`。
+
+### 已知但不阻断 Day 3 的技术债
+
+1. `RespawnPlayer()` 执行完成后没有立即从 `PendingRespawnTimers` 移除对应条目；同一 Controller 后续仍可复用该 Handle，但 Match End 的取消数量可能包含已经执行完毕的 Timer。
+2. `MulticastHealthChanged()` 接收 `NewHealth`，当前广播时使用成员变量 `Health`；客户端 RPC 与属性复制顺序不保证一致，后续 HUD 工作前应重新检查。
+3. `ApplyHealthChange()` 被客户端直接调用时不会修改 Health，但返回值仍可能表示“本来可以发生变化”；当前正式伤害入口已由 `ApplyDamage()` 的 Authority 检查规避。
+4. `HandlePlayerDeath()` 当前只从 Pawn 或 Controller 解析 Killer PlayerState；当前弹丸链传入玩家 Pawn，已通过测试，但未来陷阱/环境 Actor 伤害需要另行定义归属。
+
+### Day 3 开始门槛
+
+Day 2 功能门槛已经满足，不需要继续扩展死亡/重生系统。开始 Day 3 前只需把当前 Day 2 工作区视为待固定基线：确认非 Day 2 资产归属、清理 `git diff --check`、完成一次与当前源码对应的 Build，并保存/编译相关 Blueprint。随后 Day 3 只实现计划中的单一用途 `ASControlNode`，不要把上述非阻断技术债扩展成新的通用系统。
 
 ---
 

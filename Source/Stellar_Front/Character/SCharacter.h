@@ -128,6 +128,8 @@ public:
 	virtual void Landed(const FHitResult& Hit) override;
 
 	virtual void OnJumped_Implementation() override;
+	
+	virtual void Destroyed() override;
 
 	void PostInitializeComponents() override;
 	
