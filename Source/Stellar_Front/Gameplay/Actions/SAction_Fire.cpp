@@ -11,22 +11,23 @@
 bool USAction_Fire::CanStart_Implementation(AActor* Instigator)
 {
 	ASCharacter* Character = Cast<ASCharacter>(Instigator);
-	if (Character)
+	if (!Character)
 	{
-		ASGunBase* Gun = Character->GetEquippedGun();
-		if (!Gun)
-		{
-			return false;
-		}
-
-		//check first time 
-		if (Gun->MagHasAmmo() && Super::CanStart_Implementation(Instigator))
-		{
-			return true;
-		}
-		//play "Ka Ke" sound like no bullet in that gun
-		Gun->PlayKakeSound();
+		return false;
 	}
+	ASGunBase* Gun = Character->GetEquippedGun();
+	if (!Gun)
+	{
+		return false;
+	}
+
+	//check first time 
+	if (Gun->MagHasAmmo() && Super::CanStart_Implementation(Instigator))
+	{
+		return true;
+	}
+	//play "Ka Ke" sound like no bullet in that gun
+	Gun->PlayKakeSound();
 	return false;
 }
 

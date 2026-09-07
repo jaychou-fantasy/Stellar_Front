@@ -116,11 +116,11 @@ protected:
 	TSubclassOf<ASGunBase> GunClass;
 
 	/** The weapon spawned and currently equipped by this character. */
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="Weapons")
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly,ReplicatedUsing = "OnRep_EquippedGun", Category="Weapons")
 	TObjectPtr<ASGunBase> EquippedGun;
 	
 	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite,Category = "UI")
-	UMainWidget* MainUI;
+	UMainWidget* MainUI = nullptr;
 	
 public:
 	ASCharacter();
@@ -159,7 +159,11 @@ protected:
 	void LookInput(const FInputActionValue& InputValue);
 
 	void PrimaryInteract(const FInputActionValue& InputValue);
-
+	
+	UFUNCTION()
+	void OnRep_EquippedGun();
+	
+	
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 	//virtual void Tick(float DeltaSeconds) override;
 

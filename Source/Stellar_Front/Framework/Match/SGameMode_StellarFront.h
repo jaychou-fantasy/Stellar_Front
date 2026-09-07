@@ -28,19 +28,17 @@ public:
 	
 	virtual bool ReadyToStartMatch_Implementation() override;
 	
-	virtual void HandleMatchHasStarted() override;
+
 	
 	virtual bool ReadyToEndMatch_Implementation() override;
 	
-	virtual void HandleMatchHasEnded() override;
 	
 	virtual void Logout(AController* Exiting) override;
 
 	virtual void StartMatch() override;
 	virtual void EndMatch() override;
 	
-	void StartDeployment();
-	void EndDeployment();
+
 
 public:
 	void HandlePlayerDeath(AActor* Instigator,APawn* VictimPawn);
@@ -49,7 +47,32 @@ public:
 	//@fixme: set to protected if done
 	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite, Category = "GameMode")
 	int32 MaxPlayerPerTeam = 20;
+
+
 protected:
+	virtual void HandleMatchHasStarted() override;
+
+	virtual void HandleMatchHasEnded() override;
+
+	//GamePhase
+	FTimerHandle WarmupTimerHandle;
+	void StartWarmup();
+	void EndWarmup();
+
+
+	// ==== PreDeploy ====
+	UPROPERTY(EditDefaultsOnly,Category = "GameMode")
+	float DeployDuration = 180.0f;
+	FTimerHandle DeployTimerHandle;
+	void StartDeployment();
+	void EndDeployment();
+
+	void StartOrbitCombat();
+	void EndOrbitCombat();
+
+
+
+
 	//you can find corresponding TimerHandle when called "CancelRespawn" in "Log out || Handle Match Ended"
 	TMap<TWeakObjectPtr<ASPlayerController>,FTimerHandle> PendingRespawnTimers;
 	
@@ -62,10 +85,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly,Category = "GameMode")
 	float RespawnDelay = 2.0f;
 	
+	UPROPERTY(EditDefaultsOnly,Category = "GameMode")
+	float WarmupDuration = 10.0f;//@fixme: the true process may be longer
+
 	void AssignTeam(ASPlayerState* PlayerState);
 	
 	int32 CountPlayersInTeam(ETeam TargetTeam,const APlayerState* PlayerToIgnore = nullptr) const;
 	
-	void SetPhase(EGamePhase NewPhase);
+	bool SetPhase(EGamePhase NewPhase);
 	
 };

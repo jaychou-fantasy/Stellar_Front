@@ -11,7 +11,16 @@
 bool USAction_Reload::CanStart_Implementation(AActor* Instigator)
 {
 	ASCharacter* Character = Cast<ASCharacter>(Instigator);
+	if (!IsValid(Character))
+	{
+		return false;
+	}
 	ASGunBase* Gun = Character->GetEquippedGun();
+	if (!IsValid(Gun))
+	{
+		return false;
+	}
+	
 	if (Gun->TotalHasAmmo() && (Gun->GetRestMagAmmo() < Gun->GetMagSize()) && Super::CanStart_Implementation(Instigator))
 	{
 		return true;
@@ -43,9 +52,10 @@ void USAction_Reload::StartAction_Implementation(AActor* Instigator)
 	//bind OnReloadAnimEnded(from this--inherented from UObject) to this DELEGATE
 	ReloadEndedDelegate.BindUObject(this,&USAction_Reload::OnReloadAnimEnded);
 
+	//play reload animation
 	Gun->WeaponReload(Character);
 
-	//Set Delegate must after Montage play，‘cause this time the corresponding Montage Instance are created
+	//Set Delegate must after Montage play，'cause this time the corresponding Montage Instance are created
 	if(GunAnim->Montage_IsActive(WeaponReloadMontage))
 	{
 		//Then Bind this DELEGATE to this MONTAGE

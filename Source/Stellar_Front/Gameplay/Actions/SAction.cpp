@@ -51,10 +51,13 @@ void USAction::StartAction_Implementation(AActor* Instigator)
 	RepData.bIsRunning = true;
 	RepData.Instigator = Instigator;
 
-	//server get Time_Start
-	//@fixme: to accomplish ACTION UI effect
-	TimeStarted = GetWorld()->GetTimeSeconds();
-
+	/* only server get Time_Start
+	* @fixme: to accomplish ACTION UI effect
+	* if (AC->GetOwner()->HasAuthority())
+	* {
+	* 	 TimeStarted = GetWorld()->GetTimeSeconds();
+	* }
+    */
 	GetOwningComponent()->OnActionStarted.Broadcast(AC,this);
 }
 

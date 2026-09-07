@@ -289,6 +289,64 @@
 
 ---
 
-## 十八、项目定位总结
+## 十八、大厅与正式比赛启动流程
+
+> 本节描述 Demo 的目标流程与职责划分，不表示下述大厅功能当前已经全部实现。
+
+大厅不是一张静态菜单，也不是只有点击“开始游戏”后服务器才开始工作。玩家进入联网的 Lobby Map 后，大厅自己的世界和 `LobbyGameMode` 就已经在服务器运行；玩家加入、离开、选择队伍和准备状态都属于大厅玩法。正式比赛开始后，则切换到 Game Map，由比赛专用的 `GameMode` 接管规则和阶段推进。
+
+### 大厅阶段
+
+玩家进入大厅时，服务器依次处理登录和入场流程：`PreLogin` 用于连接前验证，`PostLogin` 表示对应的 `PlayerController` 已成功登录服务器，`HandleStartingNewPlayer` 决定玩家如何进入当前世界，玩家离开时则调用 `Logout`。大厅中的玩家人数统计、初始队伍分配和离开清理可以在这些生命周期节点完成。
+
+大厅界面本身不直接修改权威游戏数据。玩家点击“Ready”后，由本地 `PlayerController` 向服务器发送请求；服务器验证请求并修改该玩家 `PlayerState` 中的准备状态，再通过复制让所有客户端更新大厅 UI。队伍、准备状态等单个玩家的数据归 `PlayerState`，大厅倒计时、是否允许开始等全局信息归 `GameState`，只有服务器上的 `GameMode` 负责判断规则是否合法。
+
+```text
+玩家进入 Lobby Map
+    ↓
+PreLogin → PostLogin → HandleStartingNewPlayer
+    ↓
+选择队伍 / 点击 Ready
+    ↓
+PlayerController 向服务器发出请求
+    ↓
+服务器更新 PlayerState
+    ↓
+复制到所有客户端并刷新大厅 UI
+```
+
+### 开始游戏
+
+“Start Game”按钮是大厅流程的出口，不等同于 UE 的 `StartMatch()`。按钮请求必须由服务器处理，并在开始前检查发起者权限、最低玩家数、队伍有效性以及准备状态。检查通过后，服务器使用 `ServerTravel` 将所有玩家从 Lobby Map 带入 Game Map；需要保留玩家身份、队伍等跨图数据时采用 Seamless Travel，并由 `PlayerState` 承载需要延续的数据。
+
+进入 Game Map 后，比赛专用的 `ASGameMode_StellarFront` 被创建。它通过 `bDelayedStart` 和 `ReadyToStartMatch()` 控制比赛是否能从 `WaitingToStart` 进入 `InProgress`；条件满足后调用 `StartMatch()`，随后 UE 内部触发 `HandleMatchHasStarted()`。从这里开始，才进入《Stellar Front》的正式玩法阶段，例如热身、战前部署、轨道争夺、搜索密钥、上传和撤离。
+
+```text
+房主点击 Start Game
+    ↓
+服务器检查权限、人数、队伍与 Ready 状态
+    ↓
+ServerTravel(Game Map)
+    ↓
+创建比赛 GameMode
+    ↓
+WaitingToStart
+    ↓ ReadyToStartMatch() == true
+StartMatch()
+    ↓
+HandleMatchHasStarted()
+    ↓
+WarmingUp → PreDeploy → OrbitalCombat → SearchKey → Upload → Evacuation
+```
+
+UE 的 `MatchState` 与项目自己的 `EGamePhase` 是两个层级：`MatchState` 描述整场比赛是否等待、进行或结束，`EGamePhase` 描述一场已经开始的比赛当前处于哪个玩法阶段。大厅的 Ready 状态也不应混入 `EGamePhase`。三者关系为：大厅负责“玩家是否可以出发”，`MatchState` 负责“比赛是否已经开始”，`EGamePhase` 负责“比赛开始后正在进行哪一阶段”。
+
+### Demo 阶段的最小边界
+
+Demo 只需要实现基础大厅闭环：玩家加入与离开、自动或手动分队、Ready 状态同步、服务器开始权限、开赛条件检查以及切换到正式比赛地图。房间搜索、邀请系统、匹配分、掉线重连、房主迁移和完整在线服务不属于当前垂直切片的必要范围，可在核心比赛循环验证后再扩展。
+
+---
+
+## 十九、项目定位总结
 
 《Stellar Front》是一款以信息战和战略推进为核心的星际战争FPS。玩家不仅需要枪法，更需要情报控制、战线推进、战术部署与团队协作，最终在不断变化的银河战场中决定整个星球的命运。

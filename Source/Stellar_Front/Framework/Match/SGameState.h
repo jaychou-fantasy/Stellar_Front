@@ -7,10 +7,11 @@
 #include "SGameState.generated.h"
 
 
-
 UENUM(BlueprintType)
 enum class EGamePhase : uint8
 {
+	None,
+	DisconnectPause,
 	WarmingUp,
 	PreDeploy,
 	OrbitalCombat,
@@ -18,6 +19,10 @@ enum class EGamePhase : uint8
 	UpLoad,
 	Evacuation
 };
+
+//after define EGamePhase
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPhaseChanged,EGamePhase,NewPhase);
+
 
 /**
  * 
@@ -32,20 +37,18 @@ public:
 	//this function only called in GameMode->SetPhase
 	void SetCurrentPhase(EGamePhase NewPhase);
 	
+	UPROPERTY(BlueprintAssignable)
+	FOnPhaseChanged OnPhaseChanged;
+	
+	UFUNCTION(BlueprintPure)
 	EGamePhase GetPhase() const
 	{
 		return CurrentPhase;
 	}
 	
-	
-	// ==== PreDeploy ====
-	//@fixme:use protected and Getter after debugging
-	UPROPERTY(Replicated,BlueprintReadWrite,Category = "Deploy")
-	float DeployTimeRemaining = 180.0f;
-	
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_Phase)
-	EGamePhase CurrentPhase;
+	EGamePhase CurrentPhase = EGamePhase::None;
 	
 	UFUNCTION()
 	void OnRep_Phase();

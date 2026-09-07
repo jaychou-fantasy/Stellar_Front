@@ -12,6 +12,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Net/UnrealNetwork.h"
 
 
 ASCharacter::ASCharacter()
@@ -49,6 +50,11 @@ void ASCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+	//spawn weapon in BP editor
+	if (HasAuthority())
+	{
+		SpawnWeapon();
+	}
 }
 
 float ASCharacter::UpdateSensitivity()
@@ -130,9 +136,10 @@ void ASCharacter::OnJumped_Implementation()
 	}
 }
 
+//when the character were to destroyed , destroy the gun as well
 void ASCharacter::Destroyed()
 {
-	if (IsValid(EquippedGun))
+	if (HasAuthority() && IsValid(EquippedGun))
 	{
 		EquippedGun->Destroy();//destroy the gun actor itself
 		EquippedGun = nullptr;//clean the reference in ASCharacter
@@ -142,6 +149,10 @@ void ASCharacter::Destroyed()
 
 void ASCharacter::SpawnWeapon()
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
 	if (IsValid(EquippedGun))
 	{
 		return;
@@ -156,12 +167,9 @@ void ASCharacter::SpawnWeapon()
 	SpawnParams.Owner = this;
 	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	ASGunBase* SpawnedGun = GetWorld()->SpawnActor<ASGunBase>(
-		GunClass,
-		FTransform::Identity,
-		SpawnParams
-	);
+	
+	
+	ASGunBase* SpawnedGun = GetWorld()->SpawnActor<ASGunBase>(GunClass,FTransform::Identity,SpawnParams);
 
 	if (IsValid(SpawnedGun))
 	{
@@ -269,3 +277,28 @@ void ASCharacter::PrimaryInteract(const FInputActionValue& InputValue)
 {
 	InteractionComp->PrimaryInteract();
 }
+
+void ASCharacter::OnRep_EquippedGun()
+{
+	if(!IsValid(EquippedGun))
+	{
+		return;
+	}
+	/**SetReplicateMovement(true) will Rep Attachment
+		so here is a local Proetection : Reference first, Attachment follows
+	**/
+	//double set attachment for protection
+	if (EquippedGun->GetAttachParentActor() != this)
+	{
+		EquippedGun->AttachToComponent(ArmComponent,FAttachmentTransformRules::SnapToTargetIncludingScale);
+	}
+	EquippedGun->RefreshAmmoUI();
+}
+
+
+void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ASCharacter,EquippedGun);
+}
+

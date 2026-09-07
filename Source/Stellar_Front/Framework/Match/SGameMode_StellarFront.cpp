@@ -172,43 +172,89 @@ bool ASGameMode_StellarFront::ReadyToStartMatch_Implementation()
 	return CountPlayersInTeam(ETeam::Red) >= 1 && CountPlayersInTeam(ETeam::Blue ) >= 1;
 }
 
-void ASGameMode_StellarFront::SetPhase(EGamePhase NewPhase)
+bool ASGameMode_StellarFront::SetPhase(EGamePhase NewPhase)
 {
 	ASGameState* GameState = GetGameState<ASGameState>();
-	if (!GameState)
+	if (!GameState || GetMatchState() != MatchState::InProgress)
 	{
-		return;
+		return false;
 	}
+
+	const EGamePhase CurrentPhase = GameState->GetPhase();
+	bool bCanTransition = false;
+
+	switch (CurrentPhase)
+	{
+	case EGamePhase::None:
+		bCanTransition = NewPhase == EGamePhase::WarmingUp;
+		break;
+	case EGamePhase::WarmingUp:
+		bCanTransition = NewPhase == EGamePhase::DisconnectPause || NewPhase == EGamePhase::PreDeploy;
+		break;
+	case EGamePhase::DisconnectPause:
+		bCanTransition = NewPhase == EGamePhase::WarmingUp;
+		break;
+	case EGamePhase::PreDeploy:
+		bCanTransition = NewPhase == EGamePhase::OrbitalCombat;
+		break;
+	case EGamePhase::OrbitalCombat:
+		bCanTransition = NewPhase == EGamePhase::SearchKey;
+		break;
+	case EGamePhase::SearchKey:
+		bCanTransition = NewPhase == EGamePhase::UpLoad;
+		break;
+	case EGamePhase::UpLoad:
+		bCanTransition = NewPhase == EGamePhase::Evacuation;
+		break;
+	case EGamePhase::Evacuation:
+		break;
+	}
+
+	if (!bCanTransition)
+	{
+		UE_LOG(LogGameMode, Warning, TEXT("Rejected phase transition: %d -> %d"), static_cast<int32>(CurrentPhase), static_cast<int32>(NewPhase));
+		return false;
+	}
+
 	GameState->SetCurrentPhase(NewPhase);
-	/*
-	 set the logic when switch phase
-	 case Pre: .....
-	 */
-	
-	
+	UE_LOG(LogGameMode, Log, TEXT("Phase changed: %d -> %d"), static_cast<int32>(CurrentPhase), static_cast<int32>(NewPhase));
+	return true;
 }
 
 
 void ASGameMode_StellarFront::HandleMatchHasStarted()
 {
-	UE_LOG(LogGameMode,Log,TEXT("Match entered InProgress"));
+	UE_LOG(LogGameMode,Warning,TEXT("Match entered InProgress"));
 	Super::HandleMatchHasStarted();
-	StartDeployment();
+	StartWarmup();
 }
 
 void ASGameMode_StellarFront::StartDeployment()
 {
-	SetPhase(EGamePhase::PreDeploy);
-	FTimerHandle DeployTimer;
-	ASGameState* GameState = GetGameState<ASGameState>();  
-	float DeployTime = GameState->DeployTimeRemaining;
-	
-	GetWorld()->GetTimerManager().SetTimer(DeployTimer,this,&ASGameMode_StellarFront::EndDeployment,DeployTime);
+	if (!SetPhase(EGamePhase::PreDeploy))
+	{
+		return;
+	}
+	GetWorldTimerManager().ClearTimer(DeployTimerHandle);
+	GetWorldTimerManager().SetTimer(DeployTimerHandle,this,&ASGameMode_StellarFront::EndDeployment,DeployDuration,false);
 }
 
 void ASGameMode_StellarFront::EndDeployment()
 {
-	SetPhase(EGamePhase::OrbitalCombat);
+	StartOrbitCombat();
+}
+
+void ASGameMode_StellarFront::StartOrbitCombat()
+{
+	if (!SetPhase(EGamePhase::OrbitalCombat))
+	{
+		return;
+	}
+}
+
+void ASGameMode_StellarFront::EndOrbitCombat()
+{
+
 }
 
 void ASGameMode_StellarFront::HandlePlayerDeath(AActor* Instigator, APawn* VictimPawn)
@@ -297,6 +343,9 @@ void ASGameMode_StellarFront::CancelRespawn(ASPlayerController* PlayerController
 
 void ASGameMode_StellarFront::RespawnPlayer(TWeakObjectPtr<ASPlayerController> PlayerController)
 {
+	//remove the Used TimerHandle to avoid repeat statisic
+	PendingRespawnTimers.Remove(PlayerController);
+
 	if (!PlayerController.IsValid())
 	{
 		return;
@@ -313,6 +362,7 @@ void ASGameMode_StellarFront::RespawnPlayer(TWeakObjectPtr<ASPlayerController> P
 	PlayerState->SetIsAlive(true);
 	RestartPlayer(Controller);//try to find a APawn to spawn
 	
+
 	//if Respawn failed, re-set the "Alives state"
 	if (!Controller->GetPawn())
 	{
@@ -342,6 +392,9 @@ void ASGameMode_StellarFront::Logout(AController* Exiting)
 
 void ASGameMode_StellarFront::HandleMatchHasEnded()
 {
+	GetWorldTimerManager().ClearTimer(WarmupTimerHandle);
+	GetWorldTimerManager().ClearTimer(DeployTimerHandle);
+
 	const int32 CancelledCount = PendingRespawnTimers.Num();
 	for (TPair<TWeakObjectPtr<ASPlayerController>, FTimerHandle> Pair : PendingRespawnTimers)
 	{
@@ -362,4 +415,20 @@ void ASGameMode_StellarFront::StartMatch()
 void ASGameMode_StellarFront::EndMatch()
 {
 	Super::EndMatch();
+}
+
+void ASGameMode_StellarFront::StartWarmup()
+{
+	if (!SetPhase(EGamePhase::WarmingUp))
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(WarmupTimerHandle);
+	GetWorldTimerManager().SetTimer(WarmupTimerHandle,this,&ASGameMode_StellarFront::EndWarmup,WarmupDuration,false);
+}
+
+void ASGameMode_StellarFront::EndWarmup()
+{
+	StartDeployment();
 }

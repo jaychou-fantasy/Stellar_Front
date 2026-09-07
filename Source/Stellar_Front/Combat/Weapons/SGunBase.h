@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "SGunBase.generated.h"
 
+class ASCharacter;
 class ASGunCasing;
 class UAnimMontage;
 class UParticleSystem;
@@ -16,6 +17,7 @@ class UStaticMeshComponent;
 class ASProjectileBase;
 class UMetaSoundSource;
 class UNiagaraSystem;
+
 enum class ESCharacterState : uint8;
 
 USTRUCT(BlueprintType)
@@ -62,10 +64,19 @@ public:
 	ASGunBase();
 	
 	void PlayKakeSound();
+	
 	void PlayOnHitFeedback(const FHitResult& Hit);
+	
+	UFUNCTION(NetMulticast,Unreliable)
+	void MulticastPlayOnHitFX(uint8 SurfaceType,FVector_NetQuantize ImpactPoint,FVector_NetQuantizeNormal ImpactNormal);
+	
 	
 	UFUNCTION(BlueprintCallable)
 	void WeaponFire(APawn* InstigatorPawn, bool bIsAiming);
+	
+	//the vfx is brief performance event----sign it as Unreliable
+	UFUNCTION(NetMulticast,Unreliable)
+	void MulticastPlayFireFX(ASCharacter* InstigatorChar,bool bIsAiming);
 	
 	UFUNCTION()
 	void SpawnCasing();
@@ -79,6 +90,10 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	bool TotalHasAmmo() const;
+
+	/* GunBase interface for MainUI */
+	UFUNCTION(BlueprintCallable, Category = "Fire")
+	void RefreshAmmoUI() const;
 	
 	UFUNCTION(BlueprintCallable)
 	int32 GetRestMagAmmo() const { return MagRestAmmo; };
@@ -108,6 +123,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Icon")
 	UTexture2D* WeaponIcon;
@@ -143,16 +159,19 @@ protected:
 	TSubclassOf<AActor> DecalActor;
 	
 	//Ammo
+	UFUNCTION()
+	void OnRep_Ammo();
+	
 	UPROPERTY(EditDefaultsOnly,Category = "Fire")
 	USoundBase* KaKeSound;
 	
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Fire")
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,ReplicatedUsing= "OnRep_Ammo",Category = "Fire")
 	int32 TotalAmmo;
 	
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category = "Fire")
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,ReplicatedUsing = "OnRep_Ammo",Category = "Fire")
 	int32 MagSize;
 	
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly,ReplicatedUsing = "OnRep_Ammo")
 	int32 MagRestAmmo;
 	
 	UFUNCTION(BlueprintCallable)//used for Magazines of different volumn
@@ -164,6 +183,7 @@ protected:
 	UFUNCTION()
 	void ConsumeTotalAmmo(int32 Delta);
 	
+	/* used in AnimNotify */
 	UFUNCTION(BlueprintCallable)
 	void ReloadAmmo();
 	

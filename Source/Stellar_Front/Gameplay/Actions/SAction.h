@@ -19,10 +19,10 @@ struct FActionRepData
 	GENERATED_BODY()
 public:
 	UPROPERTY()
-	bool bIsRunning;
+	bool bIsRunning = false;
 	
 	UPROPERTY()
-	AActor* Instigator;
+	AActor* Instigator = nullptr;
 };
 
 
@@ -80,8 +80,8 @@ protected:
 	UFUNCTION()
 	void OnRep_RepData();
 	
-	UPROPERTY(Replicated)
-	float TimeStarted;
+	// UPROPERTY(Replicated)
+	// float TimeStarted;
 	
 	/* Tags added to owning actor when activated, removed when action stops */
 	UPROPERTY(EditDefaultsOnly,Category = "Tags")

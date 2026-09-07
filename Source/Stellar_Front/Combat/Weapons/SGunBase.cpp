@@ -12,11 +12,18 @@
 #include "Materials/MaterialInterface.h"
 #include "MetasoundSource.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Net/UnrealNetwork.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 
 // Sets default values
 ASGunBase::ASGunBase()
 {
+	bReplicates = true;
+	SetReplicateMovement(true);//replicate the Attachment of the gunActor
+	bNetUseOwnerRelevancy = true;//control which client need to receive this gun (set relevancy between its owner & this actor)
+	//who can see the owner ---> who can see this actor
+	//while "bOnlyRelevantToOwner" ---> only rep this gun to its owners (used in sth. of protected like AMMO AMOUNT) ---- pairing with DOREPLIFETIME_CONDITION(COND_OwnerOnly)
+	
 	PrimaryActorTick.bCanEverTick = false;
 	GunMuzzleName = "Muzzle";
 	
@@ -54,8 +61,18 @@ void ASGunBase::PlayKakeSound()
 
 void ASGunBase::PlayOnHitFeedback(const FHitResult& Hit)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+	const EPhysicalSurface SurfaceType =  UPhysicalMaterial::DetermineSurfaceType(Hit.PhysMaterial.Get());
+	MulticastPlayOnHitFX(static_cast<uint8>(SurfaceType),Hit.ImpactPoint,Hit.ImpactNormal);
+}
+
+void ASGunBase::MulticastPlayOnHitFX_Implementation(uint8 SurfaceType, FVector_NetQuantize ImpactPoint,FVector_NetQuantizeNormal ImpactNormal)
+{
 	const FOnHitFlashSound* HitFeedback = nullptr;
-	switch (UPhysicalMaterial::DetermineSurfaceType(Hit.PhysMaterial.Get()))
+	switch (SurfaceType)
 	{
 	case SurfaceType_Default:
 	case SURFACE_CONCRETE:
@@ -79,58 +96,39 @@ void ASGunBase::PlayOnHitFeedback(const FHitResult& Hit)
 
 	if (HitFeedback)
 	{
-		SpawnImpactDecal(Hit.ImpactPoint, (-Hit.ImpactNormal).Rotation(), HitFeedback->DecalMaterial, HitFeedback->DecalScale);
+		SpawnImpactDecal(ImpactPoint, (-ImpactNormal).Rotation(), HitFeedback->DecalMaterial, HitFeedback->DecalScale);
 
 		if (HitFeedback->OnHitFlash)
 		{
-			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, HitFeedback->OnHitFlash, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, HitFeedback->OnHitFlash, ImpactPoint, ImpactNormal.Rotation());
 		}
 
 		if (HitFeedback->OnHitSound)
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, HitFeedback->OnHitSound, Hit.ImpactPoint,1.6f);
+			UGameplayStatics::PlaySoundAtLocation(this, HitFeedback->OnHitSound, ImpactPoint,1.6f);
 		}
 	}
 }
 
+
 void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 {
-	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
-	if (InstigatorCharacter)
+	if (!HasAuthority())
 	{
-		USkeletalMeshComponent* Mesh1P = InstigatorCharacter->GetArm();
-
-		// Get the animation object for the arms mesh
-		//aim fire
-		//idle fire
-		//sprint | walk fire
-		//Play Arm|Weapon Animation && Play Muzzle FX
-		UAnimInstance* ArmAnim = Mesh1P->GetAnimInstance();
-		UAnimInstance* GunAnim = GunMeshComponent->GetAnimInstance();
-		const FWeaponFireAnimation& FireAnimation = GetFireAnimation(InstigatorCharacter->GetCharacterState(),bIsAiming);
-
-		if (ArmAnim && GunAnim)
-		{
-			UAnimMontage* ArmMontage = FireAnimation.ArmMontage;
-			UAnimMontage* WeaponMontage = FireAnimation.WeaponMontage;
-
-			ArmAnim->Montage_Play(ArmMontage);
-			GunAnim->Montage_Play(WeaponMontage);
-		}
-		//spawn emitter
-		if (MuzzleFlash)
-		{
-			UNiagaraFunctionLibrary::SpawnSystemAttached(MuzzleFlash,Barrel,TEXT("Muzzle"),FVector::ZeroVector,FRotator::ZeroRotator,EAttachLocation::KeepRelativeOffset,true);
-		}
-		//play meta sound
-		if (FireSound)
-		{
-			UGameplayStatics::PlaySound2D(this,FireSound);
-			//UGameplayStatics::PlaySoundAtLocation(this, FireSound, InstigatorCharacter->GetActorLocation());//they are in the same location,no need to get gun location
-		}
-		//spawn casing
-		SpawnCasing();
-
+		return;
+	}
+	ASCharacter* InstigatorCharacter = Cast<ASCharacter>(InstigatorPawn);
+	if (!IsValid(InstigatorCharacter) || InstigatorCharacter != GetInstigator())
+	{
+		return;
+	}
+	if (!MagHasAmmo() || !ensure(ProjectileClass))
+	{
+		return;
+	}
+	//check in Server
+	//multicast to play FX
+	
 		// try and fire a projectile
 		if (ensureAlways(ProjectileClass))
 		{
@@ -187,18 +185,74 @@ void ASGunBase::WeaponFire(APawn* InstigatorPawn, bool bIsAiming)
 				SpawnedProjectile->SetSourceGun(this);
 			}
 		}
+	ConsumeMagAmmo();//only change ammo amount in server 
+	MulticastPlayFireFX(InstigatorCharacter,bIsAiming);
+	
+}
 
-		//use recoil
-		InstigatorCharacter->AddControllerPitchInput(-VerticalRecoil);
-		InstigatorCharacter->AddControllerYawInput(FMath::RandRange(-HorizontalRecoil,HorizontalRecoil));
-
-		//Consume Ammo
-		ConsumeMagAmmo();
-		//update UI
-		UMainWidget* MainUI = Cast<UMainWidget>(InstigatorCharacter->GetMainUI());
-		MainUI->UpdateAmmo(GetRestMagAmmo(),TotalAmmo);
+void ASGunBase::MulticastPlayFireFX_Implementation(ASCharacter* InstigatorChar,bool bIsAiming)
+{
+	//no need to check Instigator again ,because only when it's valid can we enter this funct 
+	if (GetNetMode() == NM_DedicatedServer)//pure server(not listen server)   so no need to play fx again.only play in client
+	{
+		return;
 	}
 	
+	USkeletalMeshComponent* Mesh1P = InstigatorChar->GetArm();
+
+		// Get the animation object for the arms mesh
+		//aim fire
+		//idle fire
+		//sprint | walk fire
+		//Play Arm|Weapon Animation && Play Muzzle FX
+		UAnimInstance* ArmAnim = Mesh1P->GetAnimInstance();
+		UAnimInstance* GunAnim = GunMeshComponent->GetAnimInstance();
+		const FWeaponFireAnimation& FireAnimation = GetFireAnimation(InstigatorChar->GetCharacterState(),bIsAiming);
+
+		if (ArmAnim && GunAnim)
+		{
+			if (InstigatorChar->IsLocallyControlled())
+			{
+				UAnimMontage* ArmMontage = FireAnimation.ArmMontage;
+				ArmAnim->Montage_Play(ArmMontage);//only play in Client that control this pawn
+				//@fixme:: 3p-arm montage-->same as gun montage
+			}
+			UAnimMontage* WeaponMontage = FireAnimation.WeaponMontage;
+			GunAnim->Montage_Play(WeaponMontage);//gun montage play in every client who can see this gun
+		}
+	
+		//spawn emitter
+		if (MuzzleFlash)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAttached(MuzzleFlash,Barrel,TEXT("Muzzle"),FVector::ZeroVector,FRotator::ZeroRotator,EAttachLocation::KeepRelativeOffset,true);
+		}
+	
+		//play meta sound
+		if (FireSound)
+		{
+			//in local env, just play 2d
+			if (InstigatorChar->IsLocallyControlled())
+			{
+				UGameplayStatics::PlaySound2D(this,FireSound);
+			}
+			//in other client, play 3d sound 
+			else
+			{
+				UGameplayStatics::PlaySoundAtLocation(this, FireSound, InstigatorChar->GetActorLocation());
+				//they are in the same location,no need to get gun location
+			}
+		}
+	
+		//spawn casing
+		SpawnCasing();
+
+
+		//use recoil
+		if (InstigatorChar->IsLocallyControlled())
+		{
+			InstigatorChar->AddControllerPitchInput(-VerticalRecoil);
+			InstigatorChar->AddControllerYawInput(FMath::RandRange(-HorizontalRecoil,HorizontalRecoil));
+		}
 }
 
 void ASGunBase::SpawnImpactDecal(const FVector& SpawnLocation, const FRotator& SpawnRotation, UMaterialInterface* DecalMaterial, const FVector& DecalScale)
@@ -240,8 +294,13 @@ void ASGunBase::SpawnImpactDecal(const FVector& SpawnLocation, const FRotator& S
 
 void ASGunBase::SpawnCasing()
 {
+	if (!CasingClass || !GunMeshComponent)
+	{
+		return;
+	}
+	
 	FActorSpawnParameters SpawnParams;
-	FTransform Transform = GunMeshComponent->GetSocketTransform(TEXT("Casing"));
+	const FTransform Transform = GunMeshComponent->GetSocketTransform(TEXT("Casing"));
 	
 	GetWorld()->SpawnActor<ASGunCasing>(CasingClass,Transform,SpawnParams);
 }
@@ -267,17 +326,26 @@ void ASGunBase::WeaponReload(APawn* InstigatorPawn)
 
 void ASGunBase::ReloadAmmo()
 {
-	int32 ActualBulletToReload = MagSize - MagRestAmmo;
-	if (ActualBulletToReload < TotalAmmo)
+	if (!HasAuthority())
 	{
-		MagRestAmmo = MagSize;//or just ---- MagRestAmmo += ActualBulletToReload
-		ConsumeTotalAmmo(ActualBulletToReload);
+		return;
 	}
-	else//the case like,Total Ammo=3,but MagRestAmmo = 10(while MagSize = 30)
+
+	const int32 MissingAmmo = MagSize - MagRestAmmo;
+	const int32 ActualReloadAmount = FMath::Min(MissingAmmo, TotalAmmo);
+
+	if (ActualReloadAmount <= 0)
 	{
-		MagRestAmmo += TotalAmmo;
-		TotalAmmo = 0;
+		return;
 	}
+
+	MagRestAmmo += ActualReloadAmount;
+	TotalAmmo -= ActualReloadAmount;
+
+	//because server don't reply on "Rep_Ammo"-->To call "RefreshAmmoUI"
+	//so server RefreshAmmoUI in ReloadAmmo Funct (HasAuthority)
+	//client use OnRep_Ammo to RefreshUI
+	RefreshAmmoUI();
 }
 
 
@@ -291,19 +359,62 @@ bool ASGunBase::TotalHasAmmo() const
 	return TotalAmmo > 0;
 }
 
+void ASGunBase::RefreshAmmoUI() const
+{
+	ASCharacter* OwnerCharacter = Cast<ASCharacter>(GetOwner());
+	if (!OwnerCharacter || !OwnerCharacter->IsLocallyControlled())
+	{
+		return;
+	}
+
+	UMainWidget* MainUI = OwnerCharacter->GetMainUI();
+	if (MainUI)
+	{
+		//set UI_Ammo text
+		MainUI->UpdateAmmo(MagRestAmmo, TotalAmmo);
+	}
+}
+
+void ASGunBase::OnRep_Ammo()
+{
+	RefreshAmmoUI();
+}
+
 void ASGunBase::UpdateMagSize(int32 NewAmmoNumber)
 {
-	MagSize = NewAmmoNumber;
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	MagSize = FMath::Max(1, NewAmmoNumber);
+	MagRestAmmo = FMath::Min(MagRestAmmo, MagSize);
+
+	RefreshAmmoUI();
 }
 
 void ASGunBase::ConsumeMagAmmo()
 {
-	MagRestAmmo--;
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	MagRestAmmo = FMath::Max(0, MagRestAmmo - 1);
+
+	RefreshAmmoUI();
 }
 
 void ASGunBase::ConsumeTotalAmmo(int32 Delta)
 {
-	TotalAmmo -= Delta;
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	TotalAmmo = FMath::Max(0, TotalAmmo - Delta);
+
+	RefreshAmmoUI();
 }
 
 
@@ -334,6 +445,18 @@ void ASGunBase::BeginPlay()
 {
 	Super::BeginPlay();
 	//initialize the MagRestAmmo<--->MagSize
-	MagRestAmmo = MagSize;
+	if (HasAuthority())
+	{
+		MagRestAmmo = MagSize;
+		RefreshAmmoUI();
+	}
 	
+}
+
+void ASGunBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(ASGunBase,TotalAmmo,COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(ASGunBase,MagRestAmmo,COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(ASGunBase,MagSize,COND_OwnerOnly);
 }

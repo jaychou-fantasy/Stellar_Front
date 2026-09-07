@@ -4,16 +4,20 @@
 #include "Framework/Match/SGameState.h"
 #include "Net/UnrealNetwork.h"
 
+//run on server
 void ASGameState::SetCurrentPhase(EGamePhase NewPhase)
 {
 	if (HasAuthority())
 	{
 		CurrentPhase = NewPhase;
+		OnPhaseChanged.Broadcast(CurrentPhase);
 	}
 }
 
+//run on remote client
 void ASGameState::OnRep_Phase()
 {
+	OnPhaseChanged.Broadcast(CurrentPhase);
 }
 
 void ASGameState::OnRep_KeyStatus()
@@ -25,7 +29,6 @@ void ASGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);                                                              
                                                                                                                         
 	DOREPLIFETIME(ASGameState, CurrentPhase);         
-	DOREPLIFETIME(ASGameState,DeployTimeRemaining);
 	DOREPLIFETIME(ASGameState, RedControlNodes);                                                                      
 	DOREPLIFETIME(ASGameState, BlueControlNodes);                                                                     
 	DOREPLIFETIME(ASGameState, bKeyFound);                                                                            
