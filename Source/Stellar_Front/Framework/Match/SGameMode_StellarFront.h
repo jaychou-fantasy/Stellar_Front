@@ -42,6 +42,7 @@ public:
 
 public:
 	void HandlePlayerDeath(AActor* Instigator,APawn* VictimPawn);
+	bool CompleteRedControlNode();
 	
 	
 	//@fixme: set to protected if done

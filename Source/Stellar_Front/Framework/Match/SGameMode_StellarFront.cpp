@@ -189,10 +189,7 @@ bool ASGameMode_StellarFront::SetPhase(EGamePhase NewPhase)
 		bCanTransition = NewPhase == EGamePhase::WarmingUp;
 		break;
 	case EGamePhase::WarmingUp:
-		bCanTransition = NewPhase == EGamePhase::DisconnectPause || NewPhase == EGamePhase::PreDeploy;
-		break;
-	case EGamePhase::DisconnectPause:
-		bCanTransition = NewPhase == EGamePhase::WarmingUp;
+		bCanTransition = NewPhase == EGamePhase::PreDeploy;
 		break;
 	case EGamePhase::PreDeploy:
 		bCanTransition = NewPhase == EGamePhase::OrbitalCombat;
@@ -255,6 +252,24 @@ void ASGameMode_StellarFront::StartOrbitCombat()
 void ASGameMode_StellarFront::EndOrbitCombat()
 {
 
+}
+
+bool ASGameMode_StellarFront::CompleteRedControlNode()
+{
+	ASGameState* GameState = GetGameState<ASGameState>();
+	if (!GameState || GameState->GetPhase() != EGamePhase::OrbitalCombat)
+	{
+		return false;
+	}
+
+	if (!SetPhase(EGamePhase::SearchKey))
+	{
+		return false;
+	}
+
+	GameState->SetRedControlNodes(1);
+	UE_LOG(LogGameMode, Log, TEXT("Red control node completed"));
+	return true;
 }
 
 void ASGameMode_StellarFront::HandlePlayerDeath(AActor* Instigator, APawn* VictimPawn)

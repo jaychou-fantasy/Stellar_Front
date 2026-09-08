@@ -14,6 +14,8 @@ enum class ETeam : uint8
 	Blue
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTeamChanged, ETeam, NewTeam);
+
 UENUM(BlueprintType)
 enum class EPlayerRole : uint8
 {
@@ -33,8 +35,13 @@ class STELLAR_FRONT_API ASPlayerState : public APlayerState
 public:
 	ASPlayerState();
 
+	UPROPERTY(BlueprintAssignable, Category = "Player|Team")
+	FOnTeamChanged OnTeamChanged;
+
 	// -- Getters --
+	UFUNCTION(BlueprintPure)
 	ETeam GetTeam() const { return Team; }
+
 	EPlayerRole GetRole() const { return PlayerRole; }
 	
 	void SetReady() { if (HasAuthority()) bReady = true; }
@@ -43,7 +50,7 @@ public:
 	
 	
 	// -- Setters (server-only, HasAuthority guarded) --
-	void SetTeam(ETeam NewTeam)           { if (HasAuthority()) Team = NewTeam; }
+	void SetTeam(ETeam NewTeam);
 	void SetRole(EPlayerRole NewRole)      { if (HasAuthority()) PlayerRole = NewRole; }
 	void SetCarryingKey(bool bCarry)       { if (HasAuthority()) bIsCarryingKey = bCarry; }
 	void SetIsAlive(bool bAlive)           { if (HasAuthority()) bIsAlive = bAlive; }
@@ -61,8 +68,11 @@ public:
 	int32 GetDeaths() const { return Deaths; } 
 
 protected:
-	UPROPERTY(Replicated,BlueprintReadOnly)
+	UPROPERTY(ReplicatedUsing = OnRep_Team, BlueprintReadOnly)
 	ETeam Team = ETeam::None;
+
+	UFUNCTION()
+	void OnRep_Team();
 	
 	UPROPERTY(Replicated,BlueprintReadOnly)
 	EPlayerRole PlayerRole = EPlayerRole::None;

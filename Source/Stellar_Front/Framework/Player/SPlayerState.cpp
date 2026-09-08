@@ -9,6 +9,22 @@ ASPlayerState::ASPlayerState()
 	SetReplicates(true);
 }
 
+void ASPlayerState::SetTeam(ETeam NewTeam)
+{
+	if (!HasAuthority() || Team == NewTeam)
+	{
+		return;
+	}
+
+	Team = NewTeam;
+	OnTeamChanged.Broadcast(Team);
+}
+
+void ASPlayerState::OnRep_Team()
+{
+	OnTeamChanged.Broadcast(Team);
+}
+
 
 void ASPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {

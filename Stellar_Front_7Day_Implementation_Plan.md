@@ -12,9 +12,6 @@
 WaitingToStart（只等待 Red / Blue 达到最低开局人数）
   -> InProgress
       -> WarmingUp（靶场热身，可移动、射击、死亡和重生）
-          -> 若有人退出：DisconnectPause（60 秒软暂停）
-              -> 对方全体同意重赛：结束本局并发出重新匹配请求
-              -> 未全体同意：重新开始完整 WarmingUp Timer
       -> PreDeploy
       -> OrbitalCombat（控制节点）
       -> SearchKey（拾取并护送密钥）
@@ -25,7 +22,7 @@ WaitingToStart（只等待 Red / Blue 达到最低开局人数）
 
 - Red：进攻方；推进控制节点、取得密钥、完成上传。
 - Blue：防守方；阻止进攻，并在撤离阶段逃离。
-- 目标人数是 2 人，最多先验证 4 人；本周实现“掉线软暂停、重赛投票、结束本局并交出重新匹配请求”的 gameplay 契约，但不接入实际 Session、Steam/EOS 或在线匹配服务。PIE 中只能验证结束本局和本地重开/返回等待，不能把它称为真实重新匹配。
+- 目标人数是 2 人，最多先验证 4 人；本周不接入 Session、Steam/EOS 或在线匹配服务。
 - 不做 20v20 平衡、在线服务、资源经济、武器 Tier、载具、职业选择、随机部署或完整计分系统。
 - 每天结束都必须先通过 C++ 编译，再做与当天有关的双窗口 PIE 验证；编译成功不等于 PIE 已通过。
 
@@ -33,11 +30,11 @@ WaitingToStart（只等待 Red / Blue 达到最低开局人数）
 
 | 责任 | 当前工程位置 | 本周约定 |
 |---|---|---|
-| 比赛规则与阶段 | `Framework/Match/SGameMode_StellarFront.*` | 只在服务器运行；唯一负责 Warmup、掉线软暂停、投票资格、阶段推进和胜负。 |
-| 全局同步状态 | `Framework/Match/SGameState.*` | 保存所有客户端都需要读取的 Phase、暂停结束时间、投票摘要和目标状态。 |
-| 玩家队伍/死亡/目标状态 | `Framework/Player/SPlayerState.*` | 服务器写入 Team、Alive、统计和当前重赛投票，客户端通过复制读取。 |
-| 玩家控制器 | `Framework/Player/SPlayerController.*` | 作为持久 HUD、提交重赛投票的 Server RPC、暂停输入控制和未来 requeue 入口。 |
-| 开火、弹丸、伤害 | `Gameplay/Actions/`、`Combat/`、`Gameplay/Attributes/` | 客户端请求，服务器生成弹丸与结算伤害；`DisconnectPause` 时停止已有 Action 并拒绝启动新 Action。 |
+| 比赛规则与阶段 | `Framework/Match/SGameMode_StellarFront.*` | 只在服务器运行；唯一负责 Warmup、阶段推进和胜负。 |
+| 全局同步状态 | `Framework/Match/SGameState.*` | 保存所有客户端都需要读取的 Phase 和目标状态。 |
+| 玩家队伍/死亡/目标状态 | `Framework/Player/SPlayerState.*` | 服务器写入 Team、Alive 和统计，客户端通过复制读取。 |
+| 玩家控制器 | `Framework/Player/SPlayerController.*` | 作为持久 HUD 的所有者。 |
+| 开火、弹丸、伤害 | `Gameplay/Actions/`、`Combat/`、`Gameplay/Attributes/` | 客户端请求，服务器生成弹丸与结算伤害。 |
 | 交互 | `Gameplay/Interaction/SInteractionComponent.*`、`SGameplayInterface.h` | 复用现有 `ServerInteract`；目标 Actor 自己在服务器重新验证距离、阶段、队伍和存活状态。 |
 | HUD | `UI/HUD/MainWidget.*` | HUD 最终由 PlayerController 创建，不能依赖会死亡和重生的 Pawn。 |
 
@@ -50,11 +47,6 @@ WaitingToStart（只等待 Red / Blue 达到最低开局人数）
 5. 目标 Actor 的重叠数组不能盲信：死亡、登出、Pawn 销毁后必须过滤无效/死亡引用。
 6. 本周不做友伤规则。若要禁止友伤，单独作为一条需求，不在本周临时加入。
 7. `WaitingToStart` 只等待双方最低人数；`WarmingUp` 到 `Evacuation` 全部位于 UE `MatchState::InProgress`。`CurrentPhase` 在比赛开始前使用 `None`，不能提前显示为 `WarmingUp`。
-8. 掉线暂停使用 `EGamePhase::DisconnectPause` 做服务器权威的“软暂停”，不调用全局 `SetGamePaused(true)`；否则 60 秒暂停 Timer 和其他 World Timer 的行为会变得不可控。
-9. Warmup 期间首次有人退出时，服务器清除 Warmup Timer，只启动一次 60 秒 DisconnectPause Timer。暂停期间再次有人退出不能重置这 60 秒，也不能替换首次退出者所确定的投票队伍。
-10. 重赛投票只由首次退出者的对方队伍参与；合格投票者在暂停开始时快照固定。只有快照中的所有玩家都投 Yes 才算通过，空集合永远不算全体同意。
-11. 60 秒结束时才结算投票：通过则结束本局并发出 requeue 请求；未通过则清空投票、解除软暂停并从完整时长重新开始 Warmup，不恢复旧 Timer 的剩余时间。
-12. GameMode 只决定“允许重赛并结束本局”；真实的离开 Session、销毁/更新 Session、`StartMatchmaking` 和异步回调必须由未来的 GameInstance/Session 层负责，不能塞进 GameMode。本周不新增该通用在线层。
 
 ---
 
@@ -274,19 +266,16 @@ Day 2 的死亡、击杀统计、Pawn 销毁、延迟重生、重生取消和 2�
 5. 死亡到重生之间，Controller 和 PlayerState 仍存在，但 Controller 暂时没有 Pawn。
 6. Day 3 的区域重叠集合不能长期盲信缓存引用；每次计算前必须过滤无效/已销毁 Pawn、无 `ASPlayerState` 的 Pawn、`IsAlive()==false` 的玩家，以及实际已离开区域的 Pawn。
 7. Day 3 不要重新设计开火、伤害或重生 RPC，也不要新增通用 Objective 框架。
-8. 当前 `ASPlayerController` 已有 `ServerSetReady()` 的 Server RPC 形式，可以沿用同一所有权边界增加重赛投票 RPC；投票规则仍由 GameMode 验证。
-9. 当前 `USActionComponent` 已有按名启动/停止 Action 和服务器 RPC，但没有 `StopAllActions()`；掉线软暂停若要真正停止连发、瞄准和冲刺，必须补一个最小的服务器停止入口。
 
 ### Day 3 不能假设的内容
 
 - 不能假设死亡前保存的 Pawn 引用在重生后仍有效。
 - 不能假设 `PendingRespawnTimers` 在一次成功重生后已经为空。
 - 不能假设 Alive/Kills/Deaths 已有客户端 `OnRep` 表现函数；目前只有属性复制。
-- 不能假设 `ASGameMode_StellarFront::SetPhase()` 已经限制合法阶段边；正常流程的单向边和 `WarmingUp <-> DisconnectPause` 异常恢复边都是 Day 3 要补齐的规则。
+- 不能假设 `ASGameMode_StellarFront::SetPhase()` 已经限制合法阶段边；正常流程的单向边都是 Day 3 要补齐的规则。
 - 不能假设 `ASGameState::OnRep_Phase()` 已经提供表现；当前函数为空。
 - 不能假设当前 Warmup 已完成：`StartWarmup()` 已存在并创建 Timer，但 `EndWarmup()` 为空，Warmup 目前无法进入 `PreDeploy`。
 - 不能假设 `CurrentPhase` 在 `WaitingToStart` 有正确的非玩法值；当前枚举首项是 `WarmingUp`，需要增加 `None` 并明确初始化。
-- 不能假设真实重新匹配已经存在：当前 Build.cs 只保留了注释掉的 `OnlineSubsystem` 提示，工程没有 Session、Lobby、EOS/Steam 或 Matchmaking 调用链。
 - 控制节点只应在确认当前阶段为 `OrbitalCombat` 时累计进度；测试前先确认比赛已经依次经过 `WarmingUp`、`PreDeploy` 并进入 `OrbitalCombat`。
 
 ### 已知但不阻断 Day 3 的技术债
@@ -298,15 +287,15 @@ Day 2 的死亡、击杀统计、Pawn 销毁、延迟重生、重生取消和 2�
 
 ### Day 3 开始门槛
 
-Day 2 功能门槛已经满足，不需要继续扩展死亡/重生系统。开始 Day 3 前先保留用户当前未提交的 Warmup 源码，完成下列顺序任务：先闭合 Warmup；再实现掉线软暂停；再实现重赛投票与 requeue 契约；最后才实现单一用途 `ASControlNode`。每个任务单独编译和验收，前一项未通过时不要开始后一项。
+Day 2 功能门槛已经满足，不需要继续扩展死亡/重生系统。Day 3 按顺序先闭合 Warmup，再实现单一用途 `ASControlNode`。每个任务单独编译和验收，前一项未通过时不要开始后一项。
 
 ---
 
-# Day 3：Warmup、掉线软暂停、重赛投票与控制节点
+# Day 3：Warmup、控制节点与阶段推进
 
 ## 目标
 
-先把 UE `MatchState` 与项目 `EGamePhase` 的入口闭合，再在 `OrbitalCombat` 阶段用一个最小控制节点推进到 `SearchKey`。Day 3 必须按下面 5 个任务顺序完成，不能把 Warmup、掉线投票和 ControlNode 一次混写。
+先把 UE `MatchState` 与项目 `EGamePhase` 的入口闭合，再在 `OrbitalCombat` 阶段用一个最小控制节点推进到 `SearchKey`。Day 3 只分为 Warmup、ControlNode 和整体验收三个任务，不能一次混写。
 
 ```text
 UE WaitingToStart
@@ -316,16 +305,12 @@ UE WaitingToStart
 
 UE InProgress
     -> WarmingUp
-        -> 正常结束：PreDeploy
-        -> 首次有人退出：DisconnectPause（60 秒）
-            -> 对方全体 Yes：EndMatch + requeue request
-            -> 未全体 Yes：WarmingUp（重新开始完整 Timer）
     -> PreDeploy
     -> OrbitalCombat
     -> SearchKey
 ```
 
-正常玩法阶段仍然只允许单向推进；`WarmingUp -> DisconnectPause -> WarmingUp` 是唯一明确允许的异常恢复边，不因此创建通用状态机。
+正常玩法阶段只允许单向推进，不因此创建通用状态机。
 
 ---
 
@@ -333,14 +318,13 @@ UE InProgress
 
 ### 推荐代码形式
 
-`EGamePhase` 增加非玩法哨兵和掉线暂停：
+`EGamePhase` 增加非玩法哨兵：
 
 ```cpp
 enum class EGamePhase : uint8
 {
     None,
     WarmingUp,
-    DisconnectPause,
     PreDeploy,
     OrbitalCombat,
     SearchKey,
@@ -366,9 +350,9 @@ bool SetPhase(EGamePhase NewPhase);
 
 - `HandleMatchHasStarted()` 在 `Super` 之后调用 `StartWarmup()`。
 - `StartWarmup()` 必须确认 UE MatchState 是 `InProgress`，清理/复用旧 Warmup Handle，设置 `WarmingUp` 后创建 Timer。
-- `EndWarmup()` 必须再次确认 MatchState 仍是 `InProgress` 且 Phase 仍是 `WarmingUp`，然后调用现有 `StartDeployment()`。
-- `EndDeployment()` 同样确认仍是 `PreDeploy` 后才能进入 `OrbitalCombat`。
-- `HandleMatchHasEnded()` 清除 Warmup、DisconnectPause、Respawn 以及后续 Objective Timer。
+- `EndWarmup()` 只调用现有 `StartDeployment()`；阶段合法性集中由 `SetPhase()` 判断。
+- `EndDeployment()` 只调用 `StartOrbitCombat()`；阶段合法性集中由 `SetPhase()` 判断。
+- `HandleMatchHasEnded()` 清除 Warmup、Deploy、Respawn 以及后续 Objective Timer。
 - `SetPhase()` 使用显式 `switch` 判断合法边，不用枚举值 `+1`，也不允许任意倒退。
 
 ### 涉及文件
@@ -391,211 +375,7 @@ bool SetPhase(EGamePhase NewPhase);
 
 ---
 
-## Day 3 - 任务 2：Warmup 退出触发 60 秒软暂停
-
-### 明确规则
-
-- 本周只处理 **Warmup 期间** 的首次 `Logout`。其他玩法阶段的掉线后果仍按各自目标规则处理，例如 Day 4 的 KeyHolder 掉落。
-- 服务器在调用 `Super::Logout()` 前读取退出者 PlayerState 和 Team；调用 `Super` 后不能再假设 PlayerState 仍在 `PlayerArray`。
-- 首次有效退出：清除 Warmup Timer，记录退出队伍，设置 `DisconnectPause`，启动固定 60 秒 Timer。
-- 暂停期间再次退出：执行正常清理，但不重置 60 秒、不更换投票队伍、不重新快照投票者。
-- 暂停期间新加入的 PlayerController 必须立即应用软暂停，但不加入当前投票者快照。
-- 当前工程没有账号、Session 或稳定网络身份，无法判断新连接是否为“同一名退出玩家重连”。因此本周把所有新连接都视为晚加入者：不取消 60 秒、不改变本轮投票资格。
-- 这是软暂停，不暂停 World。玩家玩法输入和 Action 被锁住，但 GameMode、复制和 DisconnectPause Timer 继续运行。
-
-### 推荐代码形式
-
-GameMode 增加：
-
-```cpp
-FTimerHandle DisconnectPauseTimerHandle;
-
-UPROPERTY(EditDefaultsOnly, Category = "GameMode")
-float DisconnectPauseDuration = 60.0f;
-
-bool bDisconnectPauseActive = false;
-ETeam DepartedTeam = ETeam::None;
-ETeam RematchVotingTeam = ETeam::None;
-
-void BeginDisconnectPause(ETeam InDepartedTeam);
-void FinishDisconnectPause();
-void SetPlayersDisconnectPaused(bool bPaused);
-```
-
-进入暂停的服务器顺序固定为：
-
-```text
-Logout 捕获退出者 Team
-    -> CancelRespawn(退出者)
-    -> ClearTimer(WarmupTimerHandle)
-    -> 快照对方队伍的合格投票者
-    -> SetPhase(DisconnectPause)
-    -> GameState 写入暂停结束服务器时间和投票摘要
-    -> 停止所有玩家当前 Action / 移动
-    -> Client RPC 切换到投票 UI 输入
-    -> SetTimer(DisconnectPauseTimerHandle, 60s)
-    -> Super::Logout
-```
-
-为了让“暂停”真实生效，而不是只有阶段文字变化：
-
-- `USActionComponent` 增加最小的 `StopAllActions(AActor* Instigator)`，服务器遍历现有 Actions 并停止正在运行的 Fire/Aim/Sprint/Reload。
-- `USActionComponent::StartActionByName()` 在服务器确认 Phase 不是 `DisconnectPause`；暂停中拒绝新 Action。
-- `ASCharacter` 增加单一用途 `SetDisconnectPaused(bool)`：暂停时 `StopMovementImmediately()`、禁用移动；恢复时回到 Walking。不要销毁 Pawn，也不要改 Alive。
-- `ASPlayerController` 增加 `ClientSetDisconnectPause(bool)`：暂停时忽略移动/视角输入并切到投票 UI 可操作的输入模式；恢复时解除 Ignore 并回到 Game 输入。
-
-### 涉及文件
-
-- `Framework/Match/SGameMode_StellarFront.h/.cpp`
-- `Framework/Match/SGameState.h/.cpp`
-- `Framework/Player/SPlayerController.h/.cpp`
-- `Character/SCharacter.h/.cpp`
-- `Gameplay/Actions/SActionComponent.h/.cpp`
-
-### 风险
-
-- 不能调用全局 `SetGamePaused(true)`：60 秒 Timer 必须继续走，网络客户端也必须继续收到投票状态。
-- 只锁移动/视角而不停止已运行的 Fire Timer，会导致暂停期间继续生成弹丸。
-- 只在客户端锁输入而不在服务器拒绝 Action RPC，暂停规则不完整。
-- `Logout()` 必须先保存 Team，再调用 `Super::Logout()`；顺序反过来会丢失投票队伍来源。
-- `PostLogin()` 若发生在 `DisconnectPause`，必须给新 Controller/Pawn 应用暂停；否则晚加入者仍可移动和射击。
-- 在接入账号与 Session 身份前，不要用 PlayerName 猜测是否为同一玩家重连。
-
-### 验收标准
-
-- Warmup 中一人退出后，旧 Warmup Timer 被清除，60 秒后不会误调用旧 `EndWarmup()`。
-- UE MatchState 全程保持 `InProgress`，自定义 Phase 变为 `DisconnectPause`。
-- 留在对局中的双方玩家不能移动、跳跃、开火、瞄准、冲刺、换弹或交互。
-- 60 秒倒计时继续运行并在两端显示一致；第二次 Logout 不重置倒计时。
-
----
-
-## Day 3 - 任务 3：对方全员重赛投票与 requeue 契约
-
-### 投票资格和结算
-
-- `DepartedTeam` 是首次退出玩家的队伍；`RematchVotingTeam` 是它的对方队伍。
-- 合格投票者在 `BeginDisconnectPause()` 时从 GameState `PlayerArray` 快照，只包括 `RematchVotingTeam` 的当前 PlayerState。
-- 暂停期间晚加入者不加入本轮分母；合格投票者随后退出时，其缺票仍使“全体同意”失败，不能因为 WeakPtr 失效形成空集合自动通过。
-- 每位合格玩家只有一个当前选择：`None / Yes / No`，可以在 60 秒内修改。
-- 即使提前全员 Yes，也等 60 秒结束时再结算，给退出者留出完整重连窗口。
-- 60 秒结束：所有快照成员都是 Yes 才通过；任一 None、No 或无有效合格投票者均不通过。
-
-### 推荐代码形式
-
-PlayerState 增加：
-
-```cpp
-enum class ERematchVote : uint8
-{
-    None,
-    Yes,
-    No
-};
-
-UPROPERTY(Replicated, BlueprintReadOnly)
-ERematchVote RematchVote = ERematchVote::None;
-```
-
-PlayerController 增加：
-
-```cpp
-UFUNCTION(Server, Reliable, BlueprintCallable)
-void ServerSubmitRematchVote(bool bVoteYes);
-
-UFUNCTION(Client, Reliable)
-void ClientSetDisconnectPause(bool bPaused);
-
-UFUNCTION(Client, Reliable)
-void ClientHandleRematchApproved();
-```
-
-GameMode 增加：
-
-```cpp
-TSet<TWeakObjectPtr<ASPlayerState>> EligibleRematchVoters;
-
-void SubmitRematchVote(ASPlayerController* Voter, bool bVoteYes);
-bool IsRematchVoteUnanimous() const;
-void HandleRematchApproved();
-void ResumeWarmupAfterDisconnectPause();
-```
-
-GameState 只保存客户端要显示的摘要，不保存规则：
-
-```cpp
-UPROPERTY(Replicated, BlueprintReadOnly)
-float DisconnectPauseEndServerTime = 0.0f;
-
-UPROPERTY(Replicated, BlueprintReadOnly)
-ETeam RematchVotingTeam = ETeam::None;
-
-UPROPERTY(Replicated, BlueprintReadOnly)
-int32 RequiredRematchVotes = 0;
-
-UPROPERTY(Replicated, BlueprintReadOnly)
-int32 RematchYesVotes = 0;
-
-UPROPERTY(Replicated, BlueprintReadOnly)
-bool bRematchApproved = false;
-```
-
-客户端倒计时使用 `DisconnectPauseEndServerTime - GameState->GetServerWorldTimeSeconds()`，不让服务器每秒复制一个递减 float。
-
-60 秒结算分支：
-
-```text
-全体 Yes
-    -> GameState.bRematchApproved = true
-    -> EndMatch()
-    -> ClientHandleRematchApproved()
-    -> 把 requeue request 交给未来 Session/Matchmaking 层
-
-未全体 Yes
-    -> 清空所有 RematchVote 和投票摘要
-    -> 解除玩家软暂停
-    -> StartWarmup()，从完整 WarmupDuration 重新计时
-```
-
-### 真实重新匹配边界
-
-当前工程没有启用 OnlineSubsystem/Online Services，也没有 Session 或 Lobby 所有者。因此本周不能实现真正的“离开当前 Session -> 销毁/更新 Session -> StartMatchmaking -> JoinSession -> ClientTravel”。
-
-本周做到：
-
-1. 服务器权威确认全体投票通过。
-2. 设置 `bRematchApproved` 并 `EndMatch()`。
-3. 通知各 PlayerController 当前比赛因重赛请求结束。
-4. PIE 中用返回等待状态或本地重载同一地图验证退出边界，并明确标记为 **Local Rematch Simulation**。
-
-以后选择 Steam/EOS/自建后端后，再由 GameInstance 或专用 Session Subsystem 消费 requeue request。不要现在新建一个没有后端的通用 Matchmaking 框架。
-
-### 涉及文件
-
-- `Framework/Match/SGameMode_StellarFront.h/.cpp`
-- `Framework/Match/SGameState.h/.cpp`
-- `Framework/Player/SPlayerState.h/.cpp`
-- `Framework/Player/SPlayerController.h/.cpp`
-- Day 7 的 `UI/HUD/MainWidget.*` 最终提供 Yes/No 按钮；Day 3 可用最小临时 Widget 或直接调用 BlueprintCallable RPC 做 PIE 验证。
-
-### 风险
-
-- 不保存投票者快照而直接使用实时 PlayerArray，会让晚加入或再退出改变分母。
-- `EligibleRematchVoters` 为空时使用“全部元素都是 Yes”的普通循环逻辑，会产生 vacuous truth 并错误通过。
-- GameMode 不存在于远端客户端，客户端 UI 必须读 GameState/PlayerState，不能直接查询 GameMode。
-- `RestartGame()` 或同图 `ServerTravel` 只是本地重开，不是重新匹配；文稿、日志和验收中必须区分。
-
-### 验收标准
-
-- 2 人 PIE：一人退出后，对方 1 人是唯一合格投票者；Yes 在 60 秒结束时通过，No/不投票不通过。
-- 4 人 PIE：首次退出者的对方队伍 2 人都 Yes 才通过；1 Yes + 1 No/None 不通过。
-- 非合格队伍、晚加入者和非 `DisconnectPause` 阶段提交投票均被服务器拒绝。
-- 未通过时输入恢复并重新开始完整 Warmup；通过时进入 `WaitingPostMatch`，不再启动 Warmup/PreDeploy Timer。
-- PIE 结果只能写作“本地重赛出口通过”，不能写作“在线重新匹配通过”。
-
----
-
-## Day 3 - 任务 4：实现单一用途 `ASControlNode`
+## Day 3 - 任务 2：实现单一用途 `ASControlNode`
 
 ### 推荐代码形式
 
@@ -606,7 +386,7 @@ bool bRematchApproved = false;
 - 每轮过滤无效/已销毁 Pawn、无 `ASPlayerState`、`IsAlive()==false`、Team=None 和实际已离开区域的 Pawn。
 - 只有 Phase 为 `OrbitalCombat` 才计算：Red-only 增长；Blue-only 阻止增长；双方同时存在暂停；无人时保持进度。
 - Red 首次达到 1.0 后停止节点 Timer，调用 GameMode 的单一用途完成入口；GameMode 幂等地把 Red 节点数设为 1，并推进到 `SearchKey`。
-- 不修改 Warmup、掉线暂停、投票、开火或重生 RPC；不创建 `ObjectiveBase`。
+- 不修改 Warmup、开火或重生 RPC；不创建 `ObjectiveBase`。
 
 ### 涉及文件
 
@@ -619,26 +399,33 @@ bool bRematchApproved = false;
 ### 风险
 
 - 死亡后 Pawn 会销毁并由新 Pawn 重生，不能缓存死亡前引用并长期信任。
-- `DisconnectPause` 和其他非 OrbitalCombat Phase 都必须让节点停止累计。
+- 所有非 `OrbitalCombat` Phase 都必须让节点停止累计。
 - Phase 完成回调必须幂等，避免重复增加节点计数或重复进入 SearchKey。
 
 ### 验收标准
 
-- `WarmingUp`、`DisconnectPause`、`PreDeploy` 和 `SearchKey` 中节点均不增长。
+- `WarmingUp`、`PreDeploy` 和 `SearchKey` 中节点均不增长。
 - Red 单独占点增长；Blue 进入后暂停/反制；Red 在区域内死亡后旧 Pawn 不再贡献。
 - 两端看到相同控制方、进度、Red 节点数和 `SearchKey` 阶段。
 
 ---
 
-## Day 3 - 任务 5：整体验收与提交边界
+## Day 3 - 任务 3：整体验收与提交边界
 
 ### 推荐执行形式
 
 本任务不增加新规则，只做 Build、Blueprint 编译、2～4 人 Listen Server PIE 和差异整理。
 
+### 当前进度（2026-09-07）
+
+- UE 5.7 `Stellar_FrontEditor Mac Development` C++ Build 已通过。
+- `SGameMode_BP` 与 `MainHUD` 定向 Blueprint 编译均为 0 error / 0 warning。
+- `git diff --check` 已通过。
+- 当前仍缺少 `BP_ControlNode` 资产以及 `FirstPersonExampleMap` 中的节点实例，因此 ControlNode 双端复制和 `OrbitalCombat -> SearchKey` 尚未完成 PIE 验收。
+
 ### 涉及文件
 
-- 前四项明确列出的 C++、Blueprint 与地图文件
+- 前两项明确列出的 C++、Blueprint 与地图文件
 - `Stellar_Front_7Day_Implementation_Plan.md` 记录实际证据和未完成阻断
 
 ### 风险
@@ -652,11 +439,8 @@ bool bRematchApproved = false;
 1. 1 人停在 `WaitingToStart + None`。
 2. 2 人进入 `InProgress + WarmingUp`，可在靶场战斗和重生。
 3. 无掉线时按 `WarmingUp -> PreDeploy -> OrbitalCombat` 推进。
-4. Warmup 首次 Logout 清除 Warmup Timer，进入固定 60 秒 `DisconnectPause`；二次 Logout 不重置。
-5. 投票未全体 Yes：解除暂停并重新开始完整 Warmup。
-6. 投票全体 Yes：结束本局并触发本地 requeue 出口；不声称在线匹配已完成。
-7. 正常进入 OrbitalCombat 后，Red 完成唯一 ControlNode 并只推进一次到 SearchKey。
-8. C++ Build、相关 Blueprint 编译、`git diff --check` 和 2～4 人 Listen Server PIE 全部通过后，才建立 Day 3 提交与 Day 4 交接。
+4. 正常进入 OrbitalCombat 后，Red 完成唯一 ControlNode 并只推进一次到 SearchKey。
+5. C++ Build、相关 Blueprint 编译、`git diff --check` 和 2～4 人 Listen Server PIE 全部通过后，才建立 Day 3 提交与 Day 4 交接。
 
 ---
 
@@ -766,8 +550,7 @@ Red 把密钥带到上传区，并在被 Blue 争夺时正确计算服务器权�
 
 只增加必要信息，不重做 UI 美术：
 
-- 当前阶段：`WarmingUp` / `DisconnectPause` / `PreDeploy` / `OrbitalCombat` / `SearchKey` / `UpLoad` / `Evacuation`。
-- `DisconnectPause` 时显示 60 秒服务器时间倒计时、投票队伍、Yes/所需票数，以及合格玩家可操作的“重赛 Yes / No”按钮。
+- 当前阶段：`WarmingUp` / `PreDeploy` / `OrbitalCombat` / `SearchKey` / `UpLoad` / `Evacuation`。
 - 队伍、Alive 状态、持钥状态。
 - 控制点进度、上传进度、撤离倒计时（当该阶段激活时显示）。
 - 保留当前弹药 UI。
@@ -776,17 +559,15 @@ Red 把密钥带到上传区，并在被 Blue 争夺时正确计算服务器权�
 
 1. 将 HUD 创建和引用持久化到 `ASPlayerController`；不要继续依赖 `Pawn::BeginPlay`，因为 Pawn 会重生。
 2. `UMainWidget` 从 PlayerState/GameState 的复制变量读取显示值；UI 不调用服务器规则函数。
-3. 重赛按钮只调用拥有它的 `ASPlayerController::ServerSubmitRematchVote()`；按钮可用性由客户端显示，但最终资格、阶段和票数全部由服务器重验。
-4. 给关键阶段变化添加临时日志或最小文字提示，便于 PIE 排错。
-5. 先验证一条掉线分支：Warmup Logout -> 60 秒 DisconnectPause -> 投票未通过恢复 Warmup，或投票通过结束本局。
-6. 再按一次无掉线完整流程验证：
+3. 给关键阶段变化添加临时日志或最小文字提示，便于 PIE 排错。
+4. 按一次完整流程验证：
    - 两人加入、分队、出生。
    - 进入 Warmup 并正常结束到 PreDeploy。
    - Red 控制节点。
    - Red 拾取密钥，死亡后掉落并可重拾。
    - Red 到上传区，Blue 能暂停上传。
    - 上传完成进入撤离；Blue 撤离或时间到结束比赛。
-7. 逐项记录问题：复现步骤、服务器/客户端、日志、预期与实际；只修复阻断主流程的问题。
+5. 逐项记录问题：复现步骤、服务器/客户端、日志、预期与实际；只修复阻断主流程的问题。
 
 ## 最终验收清单
 
@@ -794,8 +575,6 @@ Red 把密钥带到上传区，并在被 Blue 争夺时正确计算服务器权�
 |---|---|
 | 连接与出生 | 两人稳定分队、出生点正确。 |
 | Warmup | UE 已是 InProgress；玩家可在靶场战斗，正常结束后进入 PreDeploy。 |
-| 掉线软暂停 | Warmup Logout 清掉旧 Timer；60 秒内玩法输入停止，但复制和暂停 Timer 继续。 |
-| 重赛投票 | 只有退出者对方队伍可投；全体 Yes 结束本局，未全体 Yes 重启完整 Warmup。 |
 | 战斗 | 弹丸移动同步；伤害和死亡只由服务器决定。 |
 | 节点 | Red 控制节点后阶段推进一次。 |
 | 密钥 | 拾取、掉落、重拾和同步正确。 |
@@ -805,7 +584,7 @@ Red 把密钥带到上传区，并在被 Blue 争夺时正确计算服务器权�
 
 ## 本周不做的内容
 
-- 20v20 人数、专用服务器、真实匹配/房间、Session 生命周期、Steam/EOS。本周只实现重赛投票、结束本局和 requeue 请求边界；PIE 同图重开仅是本地模拟。
+- 20v20 人数、专用服务器、真实匹配/房间、Session 生命周期、Steam/EOS。
 - 资源产出、轨道控制度、武器解锁、职业选择、建筑、载具、传送门。
 - 随机部署、假信号、复杂撤离舰、完整计分、助攻、排行榜。
 - 复杂命中反馈、击杀回放、小地图、音频混音和正式 UI 美术。

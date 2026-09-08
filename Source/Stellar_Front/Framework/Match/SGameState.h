@@ -11,7 +11,6 @@ UENUM(BlueprintType)
 enum class EGamePhase : uint8
 {
 	None,
-	DisconnectPause,
 	WarmingUp,
 	PreDeploy,
 	OrbitalCombat,
@@ -36,6 +35,8 @@ class STELLAR_FRONT_API ASGameState : public AGameState
 public:
 	//this function only called in GameMode->SetPhase
 	void SetCurrentPhase(EGamePhase NewPhase);
+	void SetRedControlNodes(int32 NewValue);
+	int32 GetRedControlNodes() const { return RedControlNodes; }
 	
 	UPROPERTY(BlueprintAssignable)
 	FOnPhaseChanged OnPhaseChanged;

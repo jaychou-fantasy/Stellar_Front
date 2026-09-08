@@ -14,6 +14,14 @@ void ASGameState::SetCurrentPhase(EGamePhase NewPhase)
 	}
 }
 
+void ASGameState::SetRedControlNodes(int32 NewValue)
+{
+	if (HasAuthority())
+	{
+		RedControlNodes = NewValue;
+	}
+}
+
 //run on remote client
 void ASGameState::OnRep_Phase()
 {
