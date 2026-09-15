@@ -44,6 +44,8 @@ public:
 
 	EPlayerRole GetRole() const { return PlayerRole; }
 	
+	bool IsCarryingKey() const { return bIsCarryingKey; }
+	
 	void SetReady() { if (HasAuthority()) bReady = true; }
 	bool GetReady() const { return bReady; }
 	

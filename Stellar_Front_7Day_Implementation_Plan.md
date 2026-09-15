@@ -416,12 +416,14 @@ bool SetPhase(EGamePhase NewPhase);
 
 本任务不增加新规则，只做 Build、Blueprint 编译、2～4 人 Listen Server PIE 和差异整理。
 
-### 当前进度（2026-09-07）
+### 当前进度（2026-09-08）
 
+- Day 3 已提交为 `bcaa041`（`done day3`），本次交接审计开始时工作区干净。
 - UE 5.7 `Stellar_FrontEditor Mac Development` C++ Build 已通过。
-- `SGameMode_BP` 与 `MainHUD` 定向 Blueprint 编译均为 0 error / 0 warning。
-- `git diff --check` 已通过。
-- 当前仍缺少 `BP_ControlNode` 资产以及 `FirstPersonExampleMap` 中的节点实例，因此 ControlNode 双端复制和 `OrbitalCombat -> SearchKey` 尚未完成 PIE 验收。
+- `SGameMode_BP`、`MainHUD` 与 `BP_ControlNode` 的定向 Blueprint 编译均为 0 error / 0 warning。
+- `BP_ControlNode` 已创建，地图中存在一个 `BP_ControlNode_C_1` 实例。
+- PIE 日志在 `01:33:34` 与 `01:36:10` 两次记录 `Phase changed: 3 -> 4` 和 `Red control node completed`，证明 `OrbitalCombat -> SearchKey` 核心完成链可重复运行。
+- 用户已完成控制节点检测与双端 UI 检查；日志本身只直接证明阶段推进和完成回调，Red/Blue 争夺、死亡过滤及两端进度一致仍属于用户可视验证证据。
 
 ### 涉及文件
 
@@ -441,6 +443,97 @@ bool SetPhase(EGamePhase NewPhase);
 3. 无掉线时按 `WarmingUp -> PreDeploy -> OrbitalCombat` 推进。
 4. 正常进入 OrbitalCombat 后，Red 完成唯一 ControlNode 并只推进一次到 SearchKey。
 5. C++ Build、相关 Blueprint 编译、`git diff --check` 和 2～4 人 Listen Server PIE 全部通过后，才建立 Day 3 提交与 Day 4 交接。
+
+---
+
+## Day 3 → Day 4 交接（开始 Day 4 前必读）
+
+### 基线与证据边界
+
+Day 3 已提交为 `bcaa041`（`done day3`），并推送到当前 `origin/main`。该提交闭合了 Warmup、PreDeploy、OrbitalCombat、ControlNode 和 SearchKey 的入口，也加入了 Team 的事件式 UI 同步。开始 Day 4 时应以该提交为基线，不要重做阶段状态机、占点逻辑或 HUD 所有权。
+
+本交接使用四层证据：
+
+1. **源码证据**：GameMode/GameState 阶段边、PlayerState Team 复制、ControlNode 服务器计算和交互 RPC 调用链。
+2. **Build 证据**：UE 5.7 `Stellar_FrontEditor Mac Development` 最新构建结果为 `Succeeded`。
+3. **Blueprint 证据**：`SGameMode_BP`、`MainHUD`、`BP_ControlNode` 定向编译为 0 error / 0 warning。
+4. **PIE 证据**：双人 Listen Server 日志两次出现 `OrbitalCombat -> SearchKey` 与 `Red control node completed`；Red/Blue 区域检测和 UI 一致性由用户可视测试确认。
+
+Build 和 Blueprint 编译不能替代 PIE；日志里的阶段完成也不能单独证明所有争夺分支和 UI 表现。
+
+### Day 3 已完成的运行契约
+
+```text
+WaitingToStart + None
+    -> Red / Blue 达到最低人数
+    -> InProgress + WarmingUp
+    -> PreDeploy
+    -> OrbitalCombat
+    -> ASControlNode 只在该阶段启动服务器 Timer
+    -> Red 单独占点推进 CaptureProgress
+    -> 完成时调用 GameMode::CompleteRedControlNode
+    -> SetPhase(SearchKey)
+```
+
+职责边界如下：
+
+- `ASGameMode_StellarFront::SetPhase()` 是唯一合法阶段边入口。
+- `ASGameState::CurrentPhase` 复制给客户端，并通过 `OnPhaseChanged` 通知阶段变化。
+- `ASControlNode` 不使用 Actor Tick；只在 `OrbitalCombat` 收到阶段事件后启动服务器 Timer，离开该阶段立即停止。
+- ControlNode 每轮重新读取重叠 Pawn，并过滤无 PlayerState、死亡玩家和 Team=None；不长期缓存死亡前 Pawn。
+- Red 单独存在时增长；Blue 单独存在或双方争夺时不增长；进度不倒退。
+- `ControllingTeam`、`CaptureProgress` 和 `RedControlNodes` 已复制；ControlNode 完成回调以阶段边保证只推进一次。
+- `ASPlayerState::Team` 使用 `ReplicatedUsing=OnRep_Team`；服务器 `SetTeam()` 和客户端 `OnRep_Team()` 统一广播 `OnTeamChanged`。
+- MainHUD 必须在绑定 `OnTeamChanged` 后立即读取一次 `GetTeam()`，避免 Team 已先完成赋值/复制时漏掉初始事件。
+
+### Day 4 可以直接依赖的内容
+
+1. `EGamePhase::SearchKey` 已能由控制节点完成后进入，且已在双人 PIE 中出现。
+2. `ASPlayerState::GetTeam()` 是服务器判断 Red/Blue 的队伍来源；`IsAlive()` 是玩家能否拾取目标的存活来源。
+3. Team、Alive 和 `bIsCarryingKey` 位于 PlayerState，能跨 Pawn 死亡/重生保留并复制。
+4. `USInteractionComponent` 已由本地 Pawn 寻找焦点，并通过 `ServerInteract()` 把目标交给服务器执行 `ISGameplayInterface::Interact()`。
+5. `ASGameState` 已有复制字段 `bKeyFound` 与 `KeyHolder`，但还缺少 Day 4 所需的服务器写入口和有效的 `OnRep_KeyStatus` 表现。
+6. `ASGameMode_StellarFront::HandlePlayerDeath()` 在销毁 Victim Pawn 前仍能取得 Victim PlayerState 与位置，适合调用密钥掉落。
+7. `ASGameMode_StellarFront::Logout()` 已是登出清理入口，Day 4 可在 `Super::Logout()` 前保存持有者状态和最后有效位置。
+
+### Day 4 不能假设的内容
+
+- 不能假设 `ServerInteract()` 已验证阶段、队伍、存活、距离或目标状态；它目前只检查目标非空。`ASNetworkKey::Interact_Implementation()` 必须在服务器重新完成全部校验。
+- 不能假设 `bKeyFound`、`KeyHolder` 或 `bIsCarryingKey` 已形成一致的拾取/掉落事务；目前只有字段与基础复制。
+- 不能假设死亡前 Pawn 引用能在重生后继续使用；密钥掉落必须在旧 Pawn 销毁前保存位置并清理持有关系。
+- 不能从客户端查询 GameMode；密钥 UI 读取 GameState、PlayerState 或复制的 Key Actor。
+- 不能新增专用拾取 RPC；继续复用现有 `ServerInteract()` 和 `ISGameplayInterface`。
+- 不创建通用 Objective、Inventory 或 Session 框架；Day 4 只新增单一用途 `ASNetworkKey`。
+
+### 开始 Day 4 前的已知遗留项
+
+1. **ControlNode 检测球干扰武器射线**：`CaptureArea` 当前 Object Type 是 `ECC_WorldDynamic`，而 `ASGunBase::WeaponFire()` 的 Object Query 包含 `ECC_WorldDynamic`。PIE 日志多次出现 `[FireTrace] HitActor=BP_ControlNode_C_1 HitComponent=CaptureArea`。应先为占点检测体使用不会进入武器查询的独立 Object Channel，或用等效方式隔离该检测体；不要让不可见占点球改变弹丸瞄准方向。
+2. **提交空白债务**：`git show --check bcaa041` 报告 `SControlNode.h/.cpp` 中存在若干 trailing whitespace。它不影响运行，但 Day 4 提交不要继续扩散，整理时只清理相关行。
+3. **旧日志中的已修复 UI 错误**：`01:16:36` 曾出现 MainHUD `Assign On Team Changed` 的 `Accessed None`；后续 PIE 已继续运行且未再出现新的同类错误。Day 4 测试仍需观察最新会话，不能把旧错误删除当成新验证。
+4. **单人门槛未在最终 ControlNode 会话重新取证**：阶段核心双人流程已通过；若 Day 4 改动触及开局或阶段入口，需重新验证 1 人仍停在 `WaitingToStart + None`。
+
+### Day 4 推荐任务顺序
+
+1. 先隔离 `CaptureArea` 与武器射线，并完成一次最小双人回归。
+2. 新建 `World/Objectives/SNetworkKey.h/.cpp`，实现预放置、服务器权威、单一用途的密钥 Actor。
+3. 在 `Interact_Implementation()` 校验 Authority、`SearchKey`、Red、Alive、距离和未被持有。
+4. 拾取成功时原子更新 Key Actor、`PlayerState::bIsCarryingKey`、`GameState::bKeyFound` 与 `KeyHolder`。
+5. 在死亡和 Logout 路径接入同一个单一用途 Drop 入口；在旧 Pawn 销毁或 `Super::Logout()` 前保存掉落位置。
+6. 创建只负责 Mesh/碰撞表现的 `BP_NetworkKey`，在地图预放置一个实例。
+7. 先做 C++ Build 和目标 Blueprint 编译，再做 2 人 Listen Server PIE：Blue/错误阶段/远距离均拒绝，Red 正确拾取，死亡和登出都能掉落并再次拾取。
+
+### Day 4 提交边界
+
+Day 4 只应包含：
+
+- `World/Objectives/SNetworkKey.h/.cpp`
+- `Framework/Match/SGameMode_StellarFront.h/.cpp`
+- `Framework/Match/SGameState.h/.cpp`
+- 必要时 `Framework/Player/SPlayerState.h/.cpp`
+- `BP_NetworkKey` 与 `FirstPersonExampleMap`
+- 本计划中的 Day 4 实际证据更新
+
+不要把上传区、撤离、Inventory、在线服务或通用 Objective 框架混入同一提交。
 
 ---
 
@@ -473,6 +566,89 @@ bool SetPhase(EGamePhase NewPhase);
 - Red 只能在 `SearchKey` 阶段、近距离拾取。
 - 两端的 KeyHolder 与 CarryingKey 状态同步。
 - 持有者死亡/登出后，密钥可再次被拾取。
+
+---
+
+## Day 4 → Day 5 交接（开始 Day 5 前必读）
+
+### 当前基线与证据边界
+
+1. 当前 `HEAD` 仍是 Day 3 提交 `bcaa041`（`done day3`），`origin/main` 也指向该提交；Day 4 尚未提交，全部位于当前工作区。
+2. 当前源码静态检查确认 Day 4 已形成以下服务器权威链：
+   - `ASNetworkKey` 只在服务器处理拾取和掉落，并复制世界显隐状态。
+   - 拾取同时写入 `ASPlayerState::bIsCarryingKey`、`ASGameState::KeyHolder` 与 `bKeyFound`。
+   - 手动按键、死亡和 Logout 都复用 `ASNetworkKey::DropKey()`；Drop 不依赖 GameMode 修改 Key 状态。
+   - 通用交互组件使用原有 `TraceDistance + TraceRadius` 做服务器距离复核，没有给 Key 新增独立交互距离。
+3. 已有 UnrealBuildTool 记录显示工程构建成功；该记录最终增量编译了 GameMode 并完成链接，其他 Day 4 C++ 文件当时为最新状态。它只能作为已有 C++ Build 证据，不替代 Blueprint 编译或 PIE。
+4. `BP_Key`、`IA_DropKey`、`IMC_DefaultPlayer`、`BP_Player` 和地图均已有对应工作区改动。Key 蓝图实际命名为 `BP_Key`，与早期计划中的 `BP_NetworkKey` 名称不同；Day 5 不需要为了名称统一而重命名资产。
+5. 用户于 2026-09-15 确认当前 Day 4 运行测试通过。本交接没有单独保存新的 PIE 日志，因此只记录“用户确认当前测试通过”，不把未留日志的各分支写成独立自动化证据。
+
+### Day 4 当前运行契约
+
+```text
+Primary Interact
+    -> USInteractionComponent 服务器复核接口与距离
+    -> ASNetworkKey::Interact_Implementation
+    -> 校验 Authority / Active / SearchKey / Red / Alive
+    -> PlayerState.CarryingKey = true
+    -> GameState.KeyHolder = PlayerState，bKeyFound = true
+    -> Key 隐藏并关闭碰撞
+
+数字键 5 / 持有者死亡 / Logout
+    -> 服务器找到当前 Key
+    -> ASNetworkKey::DropKey(原持有者, 掉落位置)
+    -> 校验记录持有者与请求持有者一致
+    -> PlayerState.CarryingKey = false
+    -> GameState.KeyHolder = nullptr，bKeyFound = false
+    -> Key 移到掉落位置并重新显示
+```
+
+- 手动掉落使用 `IA_DropKey`，由 `BP_Player` 提供给 `ASCharacter::Input_DropKey`，在 `Started` 触发服务器 RPC。
+- Key 状态以 GameState/PlayerState 为权威数据；GameMode 只在死亡、Logout 生命周期入口要求 Key 执行同一个 Drop，不负责直接改写 KeyHolder。
+- `ForceNetUpdate()` 只用于促使本次 Key Actor 状态尽快进入网络更新，不代替属性复制声明和 `OnRep`。
+- `ASGameState::OnRep_KeyFound()` 当前为空。字段仍会复制，但现阶段没有 Key UI 事件；Day 5 如果需要显示状态，应围绕实际 UI 需求补最小事件，不新增通用 Objective 框架。
+
+### 开始 Day 5 前仍需处理的入口问题
+
+Day 4 拾取成功后目前仍停留在 `SearchKey`。虽然 `ASGameMode_StellarFront::SetPhase()` 已允许 `SearchKey -> UpLoad`，但 `EndSearchKey()` 为空，Key 拾取链也没有调用任何阶段完成入口。因此 UploadZone 若严格限定在 `UpLoad`，当前流程不会自行激活它。
+
+此外，Day 5 明确要求持有者在上传阶段死亡或掉落后停止上传。当前 `ASNetworkKey::DropKey()` 和拾取校验只接受 `SearchKey`；如果拾取后立即进入 `UpLoad`，这些校验会拒绝上传阶段的掉落或重新拾取。Day 5 的第一个任务必须一起闭合以下最小规则：
+
+1. GameMode 增加或完成一个单一用途的 SearchKey 完成入口：仅当阶段仍为 `SearchKey` 且 GameState 已有有效 KeyHolder 时，调用现有 `SetPhase(EGamePhase::UpLoad)`。
+2. Key 首次在 `SearchKey` 拾取成功后请求该阶段入口；Key 的拾取/掉落状态事务仍由 Key、GameState 和 PlayerState 完成，Drop 本身不调用 GameMode。
+3. `ASNetworkKey` 在 `UpLoad` 阶段也允许当前持有者掉落，并允许 Red 重新拾取掉落的 Key；重新拾取时不得再次推进阶段。
+4. 不修改 `SetPhase()` 的集中合法边规则，不新增通用 Objective 基类、管理器或事件总线。
+
+### 当前工作区边界
+
+Day 4 相关的未提交内容至少包括：
+
+- `Config/DefaultEngine.ini`
+- `Source/Stellar_Front/World/Objectives/SNetworkKey.h/.cpp`
+- `Source/Stellar_Front/Character/SCharacter.h/.cpp`
+- `Source/Stellar_Front/Gameplay/Interaction/SInteractionComponent.h/.cpp`
+- `Source/Stellar_Front/Framework/Match/SGameMode_StellarFront.h/.cpp`
+- `Source/Stellar_Front/Framework/Match/SGameState.h/.cpp`
+- `Source/Stellar_Front/Framework/Player/SPlayerState.h`
+- `Content/Blueprints/BP_Key.uasset`
+- `Content/Input/IA_DropKey.uasset`
+- `Content/Input/IMC_DefaultPlayer.uasset`
+- `Content/Blueprints/BP_Player.uasset`
+- `Content/Maps/FirstPersonExampleMap.umap`
+
+工作区同时还有 `SControlNode.cpp`、两个材质资产、`SGameMode_BP.uasset`、本计划和 `问题StellarFront.docx` 等改动。新对话必须先重新查看 `git status` 与差异，不能默认它们都属于 Day 4，也不能覆盖或顺手整理这些用户改动。
+
+当前 `git diff --check` 仍报告若干 C++ 行尾空白。它不否定已经通过的运行测试，但在提交 Day 4 前应只清理本次涉及行的空白并重新检查，不做无关格式化。
+
+### Day 5 推荐任务顺序（一次只做一个）
+
+1. **先闭合 `SearchKey -> UpLoad` 与上传阶段 Key 生命周期。** 按上一节四条最小规则修改，并单独验收阶段推进、上传阶段手动/死亡掉落和重新拾取。
+2. **再补 GameState 上传数据。** 增加服务器写入口和复制的 `UploadProgress`；如果本阶段确有 UI，再补对应 `OnRep`/事件，否则只保留可验证的数据状态。
+3. **再实现 `ASUploadZone`。** 使用一个区域组件、服务器 Overlap 集合和 Timer；只读取 GameState 的 Phase、KeyHolder、CarryingKey 与队伍状态，不使用客户端 Tick。
+4. **再接完成入口。** 上传到 1.0 时由 GameMode 幂等确认 `UpLoad` 并通过现有 `SetPhase()` 进入 `Evacuation`。
+5. **最后做蓝图、地图与分层验收。** 放置一个 UploadZone，分别记录 C++ Build、相关 Blueprint Compile 和双人 Listen Server PIE 证据。
+
+Day 5 任务一完成前，不应先创建 UploadZone；否则区域会因为阶段仍停在 `SearchKey` 而看似失效，并掩盖真正的阶段入口缺口。
 
 ---
 

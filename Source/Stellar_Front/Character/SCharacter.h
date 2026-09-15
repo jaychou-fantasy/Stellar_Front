@@ -86,6 +86,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category= "Input")
 	UInputAction* Input_Reload;
 	
+	UPROPERTY(EditDefaultsOnly, Category= "Input")
+	UInputAction* Input_DropKey;
 	
 	/** Pawn mesh: 1st person view  */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mesh")
@@ -150,6 +152,11 @@ protected:
 	void StopSprint();
 	
 	void Reload();
+	
+	void DropKey();
+	
+	UFUNCTION(Server,Reliable)
+	void ServerDropKey();
 
 	void MoveInput(const FInputActionValue& InputValue);
 	void StopMove();

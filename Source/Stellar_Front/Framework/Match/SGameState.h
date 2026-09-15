@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Character/SCharacter.h"
 #include "GameFramework/GameState.h"
 #include "SGameState.generated.h"
 
@@ -38,6 +39,11 @@ public:
 	void SetRedControlNodes(int32 NewValue);
 	int32 GetRedControlNodes() const { return RedControlNodes; }
 	
+	ASPlayerState* GetKeyHolder() const { return KeyHolder;}
+	
+	UFUNCTION()
+	void SetKeyHolder(ASPlayerState* NewHolder);
+	
 	UPROPERTY(BlueprintAssignable)
 	FOnPhaseChanged OnPhaseChanged;
 	
@@ -60,11 +66,11 @@ protected:
     int32 BlueControlNodes = 0;     
 	
     // ===== key =====                                                                                               
-    UPROPERTY(ReplicatedUsing = OnRep_KeyStatus, BlueprintReadOnly)                   
+    UPROPERTY(ReplicatedUsing = OnRep_KeyFound, BlueprintReadOnly)                   
     bool bKeyFound = false;                                                                     
 	
     UPROPERTY(Replicated, BlueprintReadOnly)
-    APlayerState* KeyHolder = nullptr;    
+    ASPlayerState* KeyHolder = nullptr;    
 	
     UPROPERTY(Replicated, BlueprintReadOnly)                                           
     FVector UploadZoneLocation = FVector::ZeroVector;   
@@ -73,7 +79,7 @@ protected:
     float UploadProgress = 0.0f; 
 	
     UFUNCTION()
-    void OnRep_KeyStatus();
+    void OnRep_KeyFound();
 	
     // ===== evacuate =====               
     UPROPERTY(Replicated, BlueprintReadOnly)                

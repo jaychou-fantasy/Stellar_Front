@@ -71,6 +71,8 @@ protected:
 	void StartOrbitCombat();
 	void EndOrbitCombat();
 
+	void StartSearchKey();
+	void EndSearchKey();
 
 
 

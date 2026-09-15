@@ -11,8 +11,12 @@
 #include "Gameplay/Interaction/SInteractionComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Framework/Match/SGameMode_StellarFront.h"
+#include "Framework/Player/SPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "World/Objectives/SNetworkKey.h"
+#include "EngineUtils.h"
 
 
 ASCharacter::ASCharacter()
@@ -97,6 +101,16 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	EnhancedInputComponent->BindAction(Input_Reload,ETriggerEvent::Started,this,&ASCharacter::Reload);
 
 	EnhancedInputComponent->BindAction(Input_Interact,ETriggerEvent::Triggered,this,&ASCharacter::PrimaryInteract);
+
+	if (Input_DropKey)
+	{
+		EnhancedInputComponent->BindAction(Input_DropKey,ETriggerEvent::Started,this,&ASCharacter::DropKey);
+		UE_LOG(LogTemp, Log, TEXT("[DropKey] Input bound: Character=%s Action=%s"), *GetNameSafe(this), *GetNameSafe(Input_DropKey));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[DropKey] Input_DropKey is null on Character=%s. Assign IA_DropKey in the active Character Blueprint defaults."), *GetNameSafe(this));
+	}
 
 	const APlayerController* PC = GetController<APlayerController>();
 	const ULocalPlayer* LP = PC->GetLocalPlayer();
@@ -222,6 +236,44 @@ void ASCharacter::Reload()
 	}
 }
 
+void ASCharacter::DropKey()
+{
+	UE_LOG(LogTemp, Log, TEXT("[DropKey] Local input received: Character=%s"), *GetNameSafe(this));
+	ServerDropKey();
+}
+
+
+void ASCharacter::ServerDropKey_Implementation()
+{
+	ASPlayerState* PlayerState = GetPlayerState<ASPlayerState>();
+	//ASGameMode_StellarFront* GameMode = GetWorld()->GetAuthGameMode<ASGameMode_StellarFront>();
+	UE_LOG(LogTemp, Log, TEXT("[DropKey] Server request: Character=%s PlayerState=%s Alive=%s Carrying=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(PlayerState),
+		PlayerState && PlayerState->IsAlive() ? TEXT("true") : TEXT("false"),
+		PlayerState && PlayerState->IsCarryingKey() ? TEXT("true") : TEXT("false"));
+	
+	if (!PlayerState || !PlayerState->IsAlive() || !PlayerState->IsCarryingKey())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[DropKey] Server request rejected by PlayerState validation."));
+		return;
+	}
+	//pass the location the key dropped
+	//and dropping key is a low-frequency event. so no need to add Key Manager
+	const FVector DropLocation = GetActorLocation() + GetActorForwardVector() * 100.0f;
+	
+	for (TActorIterator<ASNetworkKey> It(GetWorld());It;++It)
+	{
+		//do logic
+		if (It->DropKey(PlayerState,DropLocation))//drop only once,once find it, break from loop
+		{
+			UE_LOG(LogTemp, Log, TEXT("[DropKey] Server request succeeded: Key=%s Location=%s"), *GetNameSafe(*It), *DropLocation.ToCompactString());
+			return;
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[DropKey] Server request found no key that accepted the drop."));
+}
 
 void ASCharacter::MoveInput(const FInputActionValue& InputValue)
 {
@@ -301,4 +353,3 @@ void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ASCharacter,EquippedGun);
 }
-

@@ -7,6 +7,7 @@
 #include "Framework/Player/SPlayerState.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/Pawn.h"
+#include "World/Objectives/SNetworkKey.h"
 
 
 ASGameMode_StellarFront::ASGameMode_StellarFront()
@@ -251,8 +252,21 @@ void ASGameMode_StellarFront::StartOrbitCombat()
 
 void ASGameMode_StellarFront::EndOrbitCombat()
 {
-
+	StartSearchKey();
 }
+
+void ASGameMode_StellarFront::StartSearchKey()
+{
+	if (!SetPhase(EGamePhase::SearchKey))
+	{
+		return;
+	}
+}
+
+void ASGameMode_StellarFront::EndSearchKey()
+{
+}
+
 
 bool ASGameMode_StellarFront::CompleteRedControlNode()
 {
@@ -272,6 +286,7 @@ bool ASGameMode_StellarFront::CompleteRedControlNode()
 	return true;
 }
 
+
 void ASGameMode_StellarFront::HandlePlayerDeath(AActor* Instigator, APawn* VictimPawn)
 {
 	//Update Victim's PlayerState
@@ -281,6 +296,20 @@ void ASGameMode_StellarFront::HandlePlayerDeath(AActor* Instigator, APawn* Victi
 		UE_LOG(LogGameMode,Warning,TEXT("HandlePlayerDeath: Victim %s has no ASPlayerState"),*GetNameSafe(VictimPawn));
 		return;
 	}
+	
+		//Dropping Key Logic  before Setting the Victim Dead
+	const FVector DeathLocation = VictimPawn->GetActorLocation();
+	if (VictimPlayerState->IsCarryingKey())
+	{
+		for (TActorIterator<ASNetworkKey> It(GetWorld()); It; ++It)
+		{
+			if (It->DropKey(VictimPlayerState,DeathLocation))
+			{
+				break;
+			}
+		}
+	}
+	
 	VictimPlayerState->SetIsAlive(false);
 	VictimPlayerState->AddDeaths();
 	UE_LOG(LogGameMode,Log,TEXT("Death recorded: Victim=%s Deaths=%d Alive=%s"),*GetNameSafe(VictimPlayerState),VictimPlayerState->GetDeaths(),VictimPlayerState->IsAlive() ? TEXT("true") : TEXT("false"));
@@ -315,6 +344,9 @@ void ASGameMode_StellarFront::HandlePlayerDeath(AActor* Instigator, APawn* Victi
 	{
 		UE_LOG(LogGameMode, Log, TEXT("Non-player kill recorded: Source=%s SourceClass=%s Victim=%s Deaths=%d"), *GetNameSafe(Instigator), *GetNameSafe(Instigator ? Instigator->GetClass() : nullptr), *GetNameSafe(VictimPlayerState), VictimPlayerState->GetDeaths());
 	}
+	
+	
+	
 	
 	//Respawn
 	ASPlayerController* VictimPlayerController = VictimPawn->GetController<ASPlayerController>();
@@ -376,7 +408,6 @@ void ASGameMode_StellarFront::RespawnPlayer(TWeakObjectPtr<ASPlayerController> P
 	//Respawn logic -> Set Alive
 	PlayerState->SetIsAlive(true);
 	RestartPlayer(Controller);//try to find a APawn to spawn
-	
 
 	//if Respawn failed, re-set the "Alives state"
 	if (!Controller->GetPawn())
@@ -396,6 +427,22 @@ bool ASGameMode_StellarFront::ReadyToEndMatch_Implementation()
 
 void ASGameMode_StellarFront::Logout(AController* Exiting)
 {
+	//Drop Key
+	ASPlayerState* ExitPlayerState = Exiting ? Exiting->GetPlayerState<ASPlayerState>() : nullptr;
+	APawn* ExitPawn = Exiting ? Exiting->GetPawn() : nullptr;
+	if (ExitPlayerState && ExitPlayerState->IsCarryingKey())
+	{
+		for (TActorIterator<ASNetworkKey> It(GetWorld()); It; ++It)
+		{
+			const FVector ExitLocation = ExitPawn ? ExitPawn->GetActorLocation() : It->GetActorLocation();
+			if (It->DropKey(ExitPlayerState,ExitLocation))
+			{
+				break;
+			}
+		}
+	}
+	
+	
 	//Cancel Respawn
 	if (ASPlayerController* PlayerController = Cast<ASPlayerController>(Exiting))
 	{

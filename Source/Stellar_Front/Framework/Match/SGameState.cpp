@@ -2,6 +2,7 @@
 
 
 #include "Framework/Match/SGameState.h"
+#include "Framework/Player/SPlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 //run on server
@@ -28,7 +29,18 @@ void ASGameState::OnRep_Phase()
 	OnPhaseChanged.Broadcast(CurrentPhase);
 }
 
-void ASGameState::OnRep_KeyStatus()
+void ASGameState::SetKeyHolder(ASPlayerState* NewHolder)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	KeyHolder = NewHolder;
+	bKeyFound = IsValid(NewHolder);//so that when we pass "Nullptr" as NewHolder, it returns false
+}
+
+void ASGameState::OnRep_KeyFound()
 {
 }
 

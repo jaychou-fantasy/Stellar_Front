@@ -17,7 +17,7 @@ ASControlNode::ASControlNode()
 	SetRootComponent(CaptureArea);
 	CaptureArea->InitSphereRadius(500.0f);
 	CaptureArea->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	CaptureArea->SetCollisionObjectType(ECC_WorldDynamic);
+	CaptureArea->SetCollisionObjectType(ECC_GameTraceChannel2);
 	
 	CaptureArea->SetCollisionResponseToAllChannels(ECR_Ignore);
 	CaptureArea->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);

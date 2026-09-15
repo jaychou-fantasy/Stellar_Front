@@ -34,12 +34,12 @@ void USInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	 However, this also means that on the client, Player 1's "Press E" widget will also be displayed for Player 2, Player 3, etc.*/
 	if (MyPawn->IsLocallyControlled())
 	{
-		FindBestInteractable();
+		TryToInteract();
 	}
 }
 
 //use ray to find
-void USInteractionComponent::FindBestInteractable()
+void USInteractionComponent::TryToInteract()
 {
 	bool bDebugDraw = CVarDrawInteraction.GetValueOnGameThread();
 	
@@ -97,12 +97,24 @@ void USInteractionComponent::PrimaryInteract()
 
 void USInteractionComponent::ServerInteract_Implementation(AActor* Infocus)
 {
-	if (Infocus == nullptr)
+	//double check if valid
+	APawn* MyPawn = Cast<APawn>(GetOwner());
+	if (!IsValid(Infocus) || !IsValid(MyPawn) || !Infocus->Implements<USGameplayInterface>())
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red, "No Focus Actor To Interact!");
+		GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Red, "No Focus Actor To Interact! || Focus Actor Can't Interact!");
 		return;
 	}
 	
-	APawn* MyPawn = Cast<APawn>(GetOwner());
+	//check if is out of interact distance 
+	FVector EyeLocation;
+	FRotator EyeRotation;
+	MyPawn->GetActorEyesViewPoint(EyeLocation,EyeRotation);
+	const float MaxDistance  = TraceDistance + TraceRadius;
+	if (FVector::DistSquared(EyeLocation,Infocus->GetActorLocation()) > FMath::Square(MaxDistance))
+	{
+		return;
+	}
+	
+	//execute interact logic
 	ISGameplayInterface::Execute_Interact(Infocus,MyPawn);
 }
